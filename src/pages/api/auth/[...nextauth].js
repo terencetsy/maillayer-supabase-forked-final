@@ -1,0 +1,64 @@
+import NextAuth from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import connectToDatabase from '@/lib/mongodb';
+import User from '@/models/User';
+
+export const authOptions = {
+    providers: [
+        CredentialsProvider({
+            name: 'Credentials',
+            credentials: {
+                email: { label: 'Email', type: 'email' },
+                password: { label: 'Password', type: 'password' },
+            },
+            async authorize(credentials) {
+                await connectToDatabase();
+
+                // Find user by email
+                const user = await User.findOne({ email: credentials.email }).select('+password');
+
+                // Check if user exists and password matches
+                if (!user || !(await user.comparePassword(credentials.password))) {
+                    throw new Error('Invalid email or password');
+                }
+
+                return {
+                    id: user._id.toString(),
+                    email: user.email,
+                    name: user.name,
+                    role: user.role,
+                };
+            },
+        }),
+    ],
+    callbacks: {
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id;
+                token.role = user.role;
+                console.log('JWT callback - adding user data to token:', { id: user.id, role: user.role });
+            }
+            return token;
+        },
+        async session({ session, token }) {
+            if (token) {
+                session.user.id = token.id;
+                session.user.role = token.role;
+                console.log('Session callback - adding token data to session:', { id: token.id, role: token.role });
+            }
+            return session;
+        },
+    },
+    pages: {
+        signIn: '/login',
+        error: '/login',
+    },
+    session: {
+        strategy: 'jwt',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+    },
+    secret: process.env.NEXTAUTH_SECRET,
+    debug: process.env.NODE_ENV === 'development',
+};
+
+export default NextAuth(authOptions);
