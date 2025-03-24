@@ -128,22 +128,13 @@ export default function Dashboard() {
                         </Link>
                     </div>
 
-                    <nav className="main-nav">
+                    {/* <nav className="main-nav">
                         <ul>
                             <li className="active">
                                 <Link href="/brands">Dashboard</Link>
                             </li>
-                            <li>
-                                <Link href="/brands">Brands</Link>
-                            </li>
-                            <li>
-                                <Link href="/campaigns">Campaigns</Link>
-                            </li>
-                            <li>
-                                <Link href="/subscribers">Subscribers</Link>
-                            </li>
                         </ul>
-                    </nav>
+                    </nav> */}
 
                     <div className="dashboard-user">
                         <span>{userProfile?.email || session.user.email}</span>
