@@ -1,0 +1,522 @@
+/* Clean Brand Layout Styles */
+
+// Modern dark theme variables
+$background-primary: #000000;
+$background-secondary: #111111;
+$background-tertiary: #1e1e1e;
+$surface-color: #1e1e1e;
+$border-color: #2e2e2e;
+$hover-color: #2e2e2e;
+$active-color: #333333;
+
+$text-primary: #ffffff;
+$text-secondary: rgba(255, 255, 255, 0.7);
+$text-tertiary: rgba(255, 255, 255, 0.5);
+
+$accent-color: #5d87ff;
+$accent-secondary: #333347;
+$danger-color: #ff5e5e;
+$success-color: #4bd865;
+$warning-color: #ffbe0b;
+
+$border-radius-sm: 6px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+$sidebar-width: 260px;
+$header-height: 64px;
+$transition-normal: all 0.2s ease;
+
+// App container
+.app-container {
+    display: flex;
+    min-height: 100vh;
+    max-width: 100vw;
+    background-color: $background-primary;
+    color: $text-primary;
+}
+
+// Sidebar
+.sidebar {
+    width: $sidebar-width;
+    background-color: $background-secondary;
+    border-right: 1px solid $border-color;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 10;
+    overflow-y: auto;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+}
+
+.sidebar-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid $border-color;
+}
+
+.brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(45deg, #5d87ff, #ff7a89);
+        border-radius: $border-radius-sm;
+    }
+
+    .brand-info {
+        display: flex;
+        flex-direction: column;
+
+        .brand-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .brand-email {
+            font-size: 12px;
+            color: $text-secondary;
+        }
+    }
+}
+
+.sidebar-nav {
+    padding: 16px 0;
+    border-bottom: 1px solid $border-color;
+}
+
+.sidebar-section {
+    padding: 16px 0;
+    flex: 1;
+
+    .section-header {
+        padding: 0 16px 8px;
+
+        h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: $text-tertiary;
+            margin: 0;
+        }
+    }
+
+    .section-content {
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+.sidebar-footer {
+    padding: 16px 0;
+    border-top: 1px solid $border-color;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    text-decoration: none;
+    color: $text-secondary;
+    font-size: 14px;
+    transition: $transition-normal;
+    position: relative;
+
+    svg {
+        margin-right: 12px;
+    }
+
+    &:hover {
+        background-color: $hover-color;
+        color: $text-primary;
+    }
+
+    &.active {
+        background-color: $active-color;
+        color: $text-primary;
+
+        svg {
+            color: $accent-color;
+        }
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background-color: $accent-color;
+        }
+    }
+
+    &.secondary {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .badge {
+        margin-left: auto;
+        background-color: $accent-secondary;
+        color: $text-secondary;
+        font-size: 11px;
+        border-radius: 12px;
+        padding: 2px 8px;
+    }
+}
+
+// Main content
+.brand-main-content {
+    flex: 1;
+    margin-left: $sidebar-width;
+    min-height: 100vh;
+    width: calc(100% - #{$sidebar-width});
+    display: flex;
+    flex-direction: column;
+}
+
+.top-header {
+    height: $header-height;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid $border-color;
+
+    .page-title {
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0;
+    }
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: $background-secondary;
+    border-radius: 6px;
+    padding: 0 12px;
+    height: 40px;
+    width: 280px;
+
+    svg {
+        color: $text-tertiary;
+        margin-right: 8px;
+    }
+
+    input {
+        background: transparent;
+        border: none;
+        color: $text-primary;
+        font-size: 14px;
+        width: 100%;
+
+        &:focus {
+            outline: none;
+        }
+
+        &::placeholder {
+            color: $text-tertiary;
+        }
+    }
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.notification-bell,
+.more-options {
+    background: transparent;
+    border: none;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: $transition-normal;
+
+    &:hover {
+        color: $text-primary;
+    }
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: $accent-color;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .user-name {
+        font-size: 14px;
+        font-weight: 500;
+    }
+}
+
+.content-area {
+    flex: 1;
+    padding: 24px;
+    background-color: $background-primary;
+}
+
+// Campaign content styles
+.campaigns-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.actions-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.action-card {
+    background-color: $surface-color;
+    border-radius: $border-radius-md;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid $border-color;
+    cursor: pointer;
+    transition: $transition-normal;
+    text-align: center;
+
+    &:hover {
+        transform: translateY(-2px);
+        border-color: $accent-color;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .icon-wrapper {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background-color: rgba(93, 135, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+
+        svg {
+            color: $accent-color;
+        }
+    }
+
+    h3 {
+        font-size: 16px;
+        margin: 0 0 8px;
+    }
+
+    p {
+        font-size: 13px;
+        color: $text-secondary;
+        margin: 0;
+    }
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h2 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .view-all {
+        font-size: 14px;
+        color: $accent-color;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+}
+
+.tab-navigation {
+    display: flex;
+    border-bottom: 1px solid $border-color;
+    margin-bottom: 24px;
+
+    .tab-item {
+        padding: 12px 16px;
+        font-size: 14px;
+        color: $text-secondary;
+        cursor: pointer;
+        transition: $transition-normal;
+        border-bottom: 2px solid transparent;
+
+        &:hover {
+            color: $text-primary;
+        }
+
+        &.active {
+            color: $text-primary;
+            border-bottom-color: $accent-color;
+        }
+    }
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 16px;
+    background-color: $surface-color;
+    border-radius: $border-radius-md;
+    border: 1px solid $border-color;
+    text-align: center;
+
+    .icon-wrapper {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: rgba(93, 135, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+
+        svg {
+            color: $accent-color;
+            opacity: 0.8;
+        }
+    }
+
+    h2 {
+        font-size: 20px;
+        margin: 0 0 12px;
+    }
+
+    p {
+        font-size: 14px;
+        color: $text-secondary;
+        max-width: 450px;
+        margin: 0 0 24px;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: $accent-color;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: $border-radius-sm;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: $transition-normal;
+
+        &:hover {
+            background-color: darken($accent-color, 5%);
+        }
+    }
+}
+
+// Loading screen
+.loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: $background-primary;
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        border-top-color: $accent-color;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    p {
+        color: $text-secondary;
+        font-size: 14px;
+    }
+}
+
+// Responsive styles
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+
+        &.open {
+            transform: translateX(0);
+        }
+    }
+
+    .brand-main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .top-header {
+        padding: 0 16px;
+    }
+
+    .search-bar {
+        width: 200px;
+    }
+
+    .user-profile .user-name {
+        display: none;
+    }
+
+    .content-area {
+        padding: 16px;
+    }
+}

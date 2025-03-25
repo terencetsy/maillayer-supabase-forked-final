@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { MailSend02 } from '@/lib/icons';
+import { Mail, Plus, Search, MoreVertical, Bell, LogOut, Grid, List, X, Filter } from 'lucide-react';
 import BrandForm from '@/components/BrandForm';
 
 export default function Dashboard() {
@@ -13,6 +13,9 @@ export default function Dashboard() {
     const [brands, setBrands] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showCreateForm, setShowCreateForm] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState('list'); // 'grid' or 'list'
+    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -97,18 +100,18 @@ export default function Dashboard() {
         setShowCreateForm(false);
     };
 
-    const getBadgeClass = (status) => {
+    const getStatusColor = (status) => {
         switch (status) {
             case 'active':
-                return 'badge-success';
+                return '#51cf66';
             case 'inactive':
-                return 'badge-inactive';
+                return '#adb5bd';
             case 'pending_setup':
-                return 'badge-setup';
+                return '#74c0fc';
             case 'pending_verification':
-                return 'badge-pending';
+                return '#ff5252';
             default:
-                return 'badge-inactive';
+                return '#adb5bd';
         }
     };
 
@@ -127,9 +130,12 @@ export default function Dashboard() {
         }
     };
 
+    // Filter brands based on search query
+    const filteredBrands = brands.filter((brand) => brand.name.toLowerCase().includes(searchQuery.toLowerCase()) || brand.website.toLowerCase().includes(searchQuery.toLowerCase()));
+
     if (status === 'loading' || isLoading) {
         return (
-            <div className="dashboard-loading">
+            <div className="loading-screen">
                 <div className="spinner"></div>
                 <p>Loading your dashboard...</p>
             </div>
@@ -141,51 +147,114 @@ export default function Dashboard() {
     return (
         <>
             <Head>
-                <title>Dashboard | Maillayer</title>
+                <title>Brands | Iconbuddy</title>
                 <meta
                     name="description"
-                    content="Maillayer Dashboard"
+                    content="Iconbuddy Brand Dashboard"
                 />
             </Head>
 
-            <div className="dashboard">
+            <div className="modern-dashboard">
                 <header className="dashboard-header">
                     <div className="dashboard-logo">
                         <Link href="/brands">
-                            <MailSend02 />
-                            <span>Maillayer</span>
+                            <Mail size={24} />
+                            <span>Iconbuddy</span>
                         </Link>
                     </div>
 
-                    <div className="dashboard-user">
-                        <div className="user-info">
-                            <span className="user-name">{userProfile?.name || 'User'}</span>
-                            <span className="user-email">{userProfile?.email || session.user.email}</span>
+                    <div className="header-actions">
+                        <div className="search-bar">
+                            <Search size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search brands..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            {searchQuery && (
+                                <button
+                                    className="clear-search"
+                                    onClick={() => setSearchQuery('')}
+                                    aria-label="Clear search"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
                         </div>
-                        <button
-                            onClick={handleSignOut}
-                            className="btn btn-outline"
-                        >
-                            Sign out
-                        </button>
+
+                        <div className="user-menu">
+                            <button className="notification-bell">
+                                <Bell size={20} />
+                            </button>
+
+                            <div className="user-profile">
+                                <div className="avatar">{userProfile?.name?.charAt(0) || 'U'}</div>
+                                <span className="user-name">{userProfile?.name || 'User'}</span>
+                            </div>
+
+                            <div className="dropdown">
+                                <button className="more-options">
+                                    <MoreVertical size={20} />
+                                </button>
+                                <div className="dropdown-menu">
+                                    <button
+                                        onClick={handleSignOut}
+                                        className="dropdown-item"
+                                    >
+                                        <LogOut size={16} />
+                                        <span>Sign out</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </header>
 
-                <main className="dashboard-main">
-                    <div className="dashboard-welcome">
-                        <h1>Brands</h1>
-                        {!showCreateForm && (
-                            <button
-                                className="btn btn-primary create-brand-btn"
-                                onClick={handleCreateClick}
-                            >
-                                <span className="btn-icon">+</span>
-                                Create New Brand
-                            </button>
-                        )}
+                <main className="main-content">
+                    <div className="dashboard-title-row">
+                        <div className="title-section">
+                            <h1>Your Brands</h1>
+                            {brands.length > 0 && (
+                                <div className="brands-count">
+                                    {brands.length} {brands.length === 1 ? 'brand' : 'brands'}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="action-buttons">
+                            {brands.length > 0 && (
+                                <div className="view-toggle">
+                                    <button
+                                        className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                        onClick={() => setViewMode('grid')}
+                                        aria-label="Grid view"
+                                    >
+                                        <Grid size={18} />
+                                    </button>
+                                    <button
+                                        className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                        onClick={() => setViewMode('list')}
+                                        aria-label="List view"
+                                    >
+                                        <List size={18} />
+                                    </button>
+                                </div>
+                            )}
+
+                            {!showCreateForm && (
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleCreateClick}
+                                >
+                                    <Plus size={16} />
+                                    Create New Brand
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="dashboard-content">
+                    <div className="brands-content">
                         {showCreateForm ? (
                             <div className="form-container">
                                 <BrandForm
@@ -197,61 +266,78 @@ export default function Dashboard() {
                             <>
                                 {brands.length === 0 ? (
                                     <div className="empty-state">
-                                        <div className="empty-state-icon">📧</div>
+                                        <div className="icon-wrapper">
+                                            <Mail size={32} />
+                                        </div>
                                         <h2>No brands found</h2>
-                                        <p>Create your first brand to start sending emails with Maillayer.</p>
+                                        <p>Create your first brand to start sending emails with Iconbuddy.</p>
                                         <button
                                             className="btn btn-primary"
                                             onClick={handleCreateClick}
                                         >
+                                            <Plus size={16} />
                                             Create Your First Brand
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="brands-grid">
-                                        {brands.map((brand) => (
-                                            <Link
-                                                href={`/brands/${brand._id}`}
-                                                key={brand._id}
-                                                className="brand-card"
-                                            >
-                                                <div className="brand-card-content">
-                                                    <div className="brand-header">
-                                                        <h3>{brand.name}</h3>
-                                                        <span className={`badge ${getBadgeClass(brand.status)}`}>{getStatusText(brand.status)}</span>
-                                                    </div>
-                                                    <div className="brand-details">
-                                                        <div className="detail-row">
-                                                            <span className="detail-label">Website</span>
-                                                            <span className="detail-value">{brand.website}</span>
-                                                        </div>
-                                                        <div className="detail-row">
-                                                            <span className="detail-label">Status</span>
-                                                            <span className="detail-value status-text">{getStatusText(brand.status)}</span>
-                                                        </div>
-                                                        <div className="detail-row">
-                                                            <span className="detail-label">Created</span>
-                                                            <span className="detail-value">{new Date(brand.createdAt).toLocaleDateString()}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="brand-footer">
-                                                        <button className="btn btn-secondary view-details-btn">View Details</button>
-                                                    </div>
+                                    <>
+                                        {filteredBrands.length === 0 ? (
+                                            <div className="empty-state search-empty">
+                                                <h2>No matching brands</h2>
+                                                <p>No brands match your search query: "{searchQuery}"</p>
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    onClick={() => setSearchQuery('')}
+                                                >
+                                                    Clear Search
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className={viewMode === 'grid' ? 'brands-grid' : 'brands-list'}>
+                                                    {filteredBrands.map((brand) => (
+                                                        <Link
+                                                            href={`/brands/${brand._id}`}
+                                                            key={brand._id}
+                                                            className="brand-card"
+                                                        >
+                                                            <div className="brand-card-content">
+                                                                <div className="brand-header">
+                                                                    <h3>{brand.name}</h3>
+                                                                    <div
+                                                                        className="status-indicator"
+                                                                        style={{ backgroundColor: getStatusColor(brand.status) }}
+                                                                    >
+                                                                        <span>{getStatusText(brand.status)}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="brand-details">
+                                                                    <div className="detail-row">
+                                                                        <span className="detail-label">Website</span>
+                                                                        <span className="detail-value">{brand.website}</span>
+                                                                    </div>
+                                                                    <div className="detail-row">
+                                                                        <span className="detail-label">Created</span>
+                                                                        <span className="detail-value">{new Date(brand.createdAt).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                </div>
+                                                                {viewMode === 'list' && (
+                                                                    <div className="brand-actions">
+                                                                        <button className="view-details-btn">View Details</button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </Link>
+                                                    ))}
                                                 </div>
-                                            </Link>
-                                        ))}
-                                    </div>
+                                            </>
+                                        )}
+                                    </>
                                 )}
                             </>
                         )}
                     </div>
                 </main>
-
-                <footer className="dashboard-footer">
-                    <div className="footer-content">
-                        <p>&copy; {new Date().getFullYear()} Maillayer. All rights reserved.</p>
-                    </div>
-                </footer>
             </div>
         </>
     );

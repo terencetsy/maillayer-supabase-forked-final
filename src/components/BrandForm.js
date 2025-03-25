@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X, Loader, AlertCircle, Globe } from 'lucide-react';
 
 export default function BrandForm({ onCancel, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -63,37 +64,68 @@ export default function BrandForm({ onCancel, onSuccess }) {
     };
 
     return (
-        <div className="brand-form-container">
-            <h2>Create a New Brand</h2>
-            <p className="brand-form-description">Let's start by setting up your brand. You can configure email sending later.</p>
+        <div className="modern-form-container">
+            <div className="form-header">
+                <h2>Create a New Brand</h2>
+                <button
+                    className="close-btn"
+                    onClick={onCancel}
+                    aria-label="Close form"
+                >
+                    <X size={18} />
+                </button>
+            </div>
 
-            {error && <div className="alert alert-error">{error}</div>}
+            <p className="form-description">Let's start by setting up your brand. You can configure email sending later.</p>
 
-            <form onSubmit={handleSubmit}>
+            {error && (
+                <div className="form-error">
+                    <AlertCircle size={16} />
+                    <span>{error}</span>
+                </div>
+            )}
+
+            <form
+                onSubmit={handleSubmit}
+                className="modern-form"
+            >
                 <div className="form-group">
-                    <label htmlFor="name">Brand Name*</label>
-                    <input
-                        id="name"
-                        name="name"
-                        type="text"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="My Company"
-                        disabled={isLoading}
-                    />
+                    <label htmlFor="name">
+                        Brand Name<span className="required">*</span>
+                    </label>
+                    <div className="input-wrapper">
+                        <input
+                            id="name"
+                            name="name"
+                            type="text"
+                            value={formData.name}
+                            onChange={handleChange}
+                            placeholder="My Company"
+                            disabled={isLoading}
+                        />
+                    </div>
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="website">Brand Website*</label>
-                    <input
-                        id="website"
-                        name="website"
-                        type="text"
-                        value={formData.website}
-                        onChange={handleChange}
-                        placeholder="example.com"
-                        disabled={isLoading}
-                    />
+                    <label htmlFor="website">
+                        Brand Website<span className="required">*</span>
+                    </label>
+                    <div className="input-wrapper">
+                        <Globe
+                            size={16}
+                            className="input-icon"
+                        />
+                        <input
+                            id="website"
+                            name="website"
+                            type="text"
+                            value={formData.website}
+                            onChange={handleChange}
+                            placeholder="example.com"
+                            disabled={isLoading}
+                        />
+                    </div>
+                    <p className="input-help">Enter your website domain without http:// or https://</p>
                 </div>
 
                 <div className="form-actions">
@@ -110,7 +142,17 @@ export default function BrandForm({ onCancel, onSuccess }) {
                         className="btn btn-primary"
                         disabled={isLoading}
                     >
-                        {isLoading ? 'Creating...' : 'Create Brand'}
+                        {isLoading ? (
+                            <>
+                                <Loader
+                                    size={16}
+                                    className="spinner"
+                                />
+                                Creating...
+                            </>
+                        ) : (
+                            'Create Brand'
+                        )}
                     </button>
                 </div>
             </form>

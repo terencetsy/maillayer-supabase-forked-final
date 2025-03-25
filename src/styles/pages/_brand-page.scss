@@ -1,0 +1,678 @@
+/* Enhanced Brand Dashboard Styles - with consistent color theme */
+
+// Using the same dark theme variables as brand details page
+$background-primary: #000000;
+$background-secondary: #111111;
+$surface-color: #1e1e1e;
+$border-color: #2e2e2e;
+$hover-color: #2e2e2e;
+$active-color: #333333;
+
+$text-primary: #ffffff;
+$text-secondary: rgba(255, 255, 255, 0.7);
+$text-tertiary: rgba(255, 255, 255, 0.5);
+
+$accent-color: #5d87ff;
+$accent-secondary: #333347;
+$danger-color: #ff5e5e;
+$success-color: #4bd865;
+$warning-color: #ffbe0b;
+
+$border-radius-xs: 4px;
+$border-radius-sm: 6px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+$header-height: 64px;
+$transition-normal: all 0.2s ease;
+
+// Dashboard layout for brands page
+.modern-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: $background-primary;
+    color: $text-primary;
+}
+
+// Header
+.dashboard-header {
+    height: $header-height;
+    background-color: $background-secondary;
+    border-bottom: 1px solid $border-color;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.dashboard-logo {
+    a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: $text-primary;
+
+        svg {
+            color: $accent-color;
+        }
+
+        span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+    }
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: $background-secondary;
+    border-radius: 6px;
+    padding: 0 12px;
+    height: 38px;
+    width: 240px;
+    position: relative;
+    transition: $transition-normal;
+    border: 1px solid $border-color;
+
+    &:focus-within {
+        border-color: $accent-color;
+    }
+
+    svg {
+        color: $text-tertiary;
+        margin-right: 8px;
+    }
+
+    input {
+        background: transparent;
+        border: none;
+        color: $text-primary;
+        font-size: 14px;
+        width: 100%;
+
+        &:focus {
+            outline: none;
+        }
+
+        &::placeholder {
+            color: $text-tertiary;
+        }
+    }
+
+    .clear-search {
+        background: transparent;
+        border: none;
+        color: $text-tertiary;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        margin-left: 8px;
+        padding: 4px;
+        border-radius: 4px;
+
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: $text-primary;
+        }
+    }
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.notification-bell,
+.more-options {
+    background: transparent;
+    border: none;
+    color: $text-secondary;
+    cursor: pointer;
+    transition: $transition-normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 4px;
+
+    &:hover {
+        background-color: $hover-color;
+        color: $text-primary;
+    }
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: $accent-color;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .user-name {
+        font-size: 14px;
+        font-weight: 500;
+    }
+}
+
+.dropdown {
+    position: relative;
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        background-color: $surface-color;
+        border: 1px solid $border-color;
+        border-radius: $border-radius-sm;
+        min-width: 180px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        z-index: 100;
+        margin-top: 8px;
+        padding: 6px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.2s ease;
+
+        &.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+    }
+
+    &:hover .dropdown-menu {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        width: 100%;
+        background: transparent;
+        border: none;
+        color: $text-secondary;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: $transition-normal;
+
+        &:hover {
+            background-color: $hover-color;
+            color: $text-primary;
+        }
+    }
+}
+
+// Main content area
+.main-content {
+    flex: 1;
+    padding: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.dashboard-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+
+    .title-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .brands-count {
+            font-size: 14px;
+            color: $text-secondary;
+        }
+    }
+
+    .action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .view-toggle {
+        display: flex;
+        background-color: $background-secondary;
+        border-radius: $border-radius-sm;
+        padding: 4px;
+        border: 1px solid $border-color;
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: $text-secondary;
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: $border-radius-xs;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: $transition-normal;
+
+            &:hover:not(.active) {
+                color: $text-primary;
+                background-color: $hover-color;
+            }
+
+            &.active {
+                background-color: $accent-color;
+                color: white;
+            }
+        }
+    }
+
+    .btn-primary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: $accent-color;
+        border: none;
+        color: white;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: $border-radius-sm;
+        cursor: pointer;
+        transition: $transition-normal;
+
+        &:hover {
+            background-color: darken($accent-color, 5%);
+            transform: translateY(-2px);
+        }
+
+        &:active {
+            transform: translateY(0);
+        }
+    }
+}
+
+.brands-content {
+    width: 100%;
+}
+
+// Empty state
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    text-align: center;
+    background-color: $surface-color;
+    border-radius: $border-radius-md;
+    border: 1px solid $border-color;
+
+    .icon-wrapper {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: rgba($accent-color, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 24px;
+
+        svg {
+            color: $accent-color;
+            opacity: 0.8;
+        }
+    }
+
+    h2 {
+        font-size: 20px;
+        margin: 0 0 12px;
+        font-weight: 600;
+    }
+
+    p {
+        font-size: 14px;
+        color: $text-secondary;
+        max-width: 400px;
+        margin: 0 0 24px;
+    }
+
+    .btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: $accent-color;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: $border-radius-sm;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: $transition-normal;
+
+        &:hover {
+            background-color: darken($accent-color, 5%);
+        }
+
+        &.btn-secondary {
+            background-color: $accent-secondary;
+            color: $text-secondary;
+
+            &:hover {
+                background-color: lighten($accent-secondary, 5%);
+            }
+        }
+    }
+
+    &.search-empty {
+        padding: 48px 24px;
+
+        h2 {
+            font-size: 20px;
+        }
+    }
+}
+
+// Brands grid
+.brands-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+// Brands list
+.brands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .brand-card {
+        max-height: none;
+
+        .brand-card-content {
+            flex-direction: row;
+            align-items: center;
+            gap: 16px;
+
+            .brand-header {
+                flex: 0 0 30%;
+                margin-bottom: 0;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .brand-details {
+                flex: 1;
+                flex-direction: row;
+                justify-content: space-around;
+
+                .detail-row {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 4px;
+                }
+            }
+
+            .brand-actions {
+                flex: 0 0 auto;
+
+                .view-details-btn {
+                    background-color: $background-secondary;
+                    border: 1px solid $border-color;
+                    color: $text-secondary;
+                    font-size: 13px;
+                    padding: 6px 14px;
+                    border-radius: $border-radius-xs;
+                    cursor: pointer;
+                    transition: $transition-normal;
+
+                    &:hover {
+                        background-color: $hover-color;
+                        color: $text-primary;
+                    }
+                }
+            }
+        }
+    }
+}
+
+.brand-card {
+    background-color: $surface-color;
+    border-radius: $border-radius-md;
+    border: 1px solid $border-color;
+    overflow: hidden;
+    transition: $transition-normal;
+    text-decoration: none;
+    color: $text-primary;
+    height: 100%;
+
+    &:hover {
+        transform: translateY(-4px);
+        border-color: $accent-color;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+
+        h3 {
+            color: $accent-color;
+        }
+    }
+}
+
+.brand-card-content {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.brand-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+
+    h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+        transition: $transition-normal;
+    }
+
+    .status-indicator {
+        font-size: 12px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+        display: inline-block;
+
+        span {
+            color: white;
+        }
+    }
+}
+
+.brand-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .detail-label {
+        font-size: 13px;
+        color: $text-tertiary;
+    }
+
+    .detail-value {
+        font-size: 14px;
+        color: $text-secondary;
+    }
+}
+
+// Form container
+.form-container {
+    background-color: $surface-color;
+    border-radius: $border-radius-md;
+    border: 1px solid $border-color;
+    padding: 24px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+// Loading screen
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: $background-primary;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba($accent-color, 0.1);
+        border-radius: 50%;
+        border-top-color: $accent-color;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    p {
+        font-size: 14px;
+        color: $text-secondary;
+    }
+}
+
+// Responsive adjustments
+@media (max-width: 1024px) {
+    .main-content {
+        padding: 20px;
+    }
+
+    .brands-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 0 16px;
+    }
+
+    .search-bar {
+        width: 180px;
+    }
+
+    .dashboard-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+
+        .action-buttons {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .btn-primary {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+
+    .brands-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .brands-list {
+        .brand-card-content {
+            flex-direction: column;
+
+            .brand-details {
+                flex-direction: column;
+            }
+
+            .brand-actions {
+                margin-top: 16px;
+                width: 100%;
+
+                .view-details-btn {
+                    width: 100%;
+                    padding: 10px;
+                }
+            }
+        }
+    }
+
+    .user-profile .user-name {
+        display: none;
+    }
+
+    .main-content {
+        padding: 16px;
+    }
+
+    .form-container {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 576px) {
+    .header-actions {
+        .search-bar {
+            display: none;
+        }
+    }
+}
