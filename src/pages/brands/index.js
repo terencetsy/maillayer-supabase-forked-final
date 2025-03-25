@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { MailSend02 } from '@/lib/icons';
-import BrandList from '@/components/BrandList';
 import BrandForm from '@/components/BrandForm';
 
 export default function Dashboard() {
@@ -98,6 +97,36 @@ export default function Dashboard() {
         setShowCreateForm(false);
     };
 
+    const getBadgeClass = (status) => {
+        switch (status) {
+            case 'active':
+                return 'badge-success';
+            case 'inactive':
+                return 'badge-inactive';
+            case 'pending_setup':
+                return 'badge-setup';
+            case 'pending_verification':
+                return 'badge-pending';
+            default:
+                return 'badge-inactive';
+        }
+    };
+
+    const getStatusText = (status) => {
+        switch (status) {
+            case 'active':
+                return 'Active';
+            case 'inactive':
+                return 'Inactive';
+            case 'pending_setup':
+                return 'Needs Setup';
+            case 'pending_verification':
+                return 'Pending Verification';
+            default:
+                return status;
+        }
+    };
+
     if (status === 'loading' || isLoading) {
         return (
             <div className="dashboard-loading">
@@ -128,19 +157,14 @@ export default function Dashboard() {
                         </Link>
                     </div>
 
-                    {/* <nav className="main-nav">
-                        <ul>
-                            <li className="active">
-                                <Link href="/brands">Dashboard</Link>
-                            </li>
-                        </ul>
-                    </nav> */}
-
                     <div className="dashboard-user">
-                        <span>{userProfile?.email || session.user.email}</span>
+                        <div className="user-info">
+                            <span className="user-name">{userProfile?.name || 'User'}</span>
+                            <span className="user-email">{userProfile?.email || session.user.email}</span>
+                        </div>
                         <button
                             onClick={handleSignOut}
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-outline"
                         >
                             Sign out
                         </button>
@@ -149,8 +173,16 @@ export default function Dashboard() {
 
                 <main className="dashboard-main">
                     <div className="dashboard-welcome">
-                        <h1>Welcome{userProfile?.name ? `, ${userProfile.name}` : ' to Maillayer'}</h1>
-                        <p>Manage your email sending brands below.</p>
+                        <h1>Brands</h1>
+                        {!showCreateForm && (
+                            <button
+                                className="btn btn-primary create-brand-btn"
+                                onClick={handleCreateClick}
+                            >
+                                <span className="btn-icon">+</span>
+                                Create New Brand
+                            </button>
+                        )}
                     </div>
 
                     <div className="dashboard-content">
@@ -162,13 +194,64 @@ export default function Dashboard() {
                                 />
                             </div>
                         ) : (
-                            <BrandList
-                                brands={brands}
-                                onCreateClick={handleCreateClick}
-                            />
+                            <>
+                                {brands.length === 0 ? (
+                                    <div className="empty-state">
+                                        <div className="empty-state-icon">📧</div>
+                                        <h2>No brands found</h2>
+                                        <p>Create your first brand to start sending emails with Maillayer.</p>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handleCreateClick}
+                                        >
+                                            Create Your First Brand
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="brands-grid">
+                                        {brands.map((brand) => (
+                                            <Link
+                                                href={`/brands/${brand._id}`}
+                                                key={brand._id}
+                                                className="brand-card"
+                                            >
+                                                <div className="brand-card-content">
+                                                    <div className="brand-header">
+                                                        <h3>{brand.name}</h3>
+                                                        <span className={`badge ${getBadgeClass(brand.status)}`}>{getStatusText(brand.status)}</span>
+                                                    </div>
+                                                    <div className="brand-details">
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Website</span>
+                                                            <span className="detail-value">{brand.website}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Status</span>
+                                                            <span className="detail-value status-text">{getStatusText(brand.status)}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Created</span>
+                                                            <span className="detail-value">{new Date(brand.createdAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="brand-footer">
+                                                        <button className="btn btn-secondary view-details-btn">View Details</button>
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </main>
+
+                <footer className="dashboard-footer">
+                    <div className="footer-content">
+                        <p>&copy; {new Date().getFullYear()} Maillayer. All rights reserved.</p>
+                    </div>
+                </footer>
             </div>
         </>
     );
