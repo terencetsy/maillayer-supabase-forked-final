@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { Edit, ArrowLeft } from 'lucide-react';
+import { Edit, ArrowLeft, Send } from 'lucide-react';
 
 export default function CampaignDetail() {
     const { data: session, status } = useSession();
@@ -141,13 +141,22 @@ export default function CampaignDetail() {
                     </div>
                     <div className="campaign-detail-actions">
                         {campaign.status === 'draft' && (
-                            <Link
-                                href={`/brands/${id}/campaigns/${campaignId}/edit`}
-                                className="edit-campaign-btn"
-                            >
-                                <Edit size={16} />
-                                Edit Campaign
-                            </Link>
+                            <>
+                                <Link
+                                    href={`/brands/${id}/campaigns/${campaignId}/edit`}
+                                    className="edit-campaign-btn"
+                                >
+                                    <Edit size={16} />
+                                    Edit Campaign
+                                </Link>
+                                <Link
+                                    href={`/brands/${id}/campaigns/${campaignId}/send`}
+                                    className="send-campaign-btn"
+                                >
+                                    <Send size={16} />
+                                    Send Campaign
+                                </Link>
+                            </>
                         )}
                     </div>
                 </div>

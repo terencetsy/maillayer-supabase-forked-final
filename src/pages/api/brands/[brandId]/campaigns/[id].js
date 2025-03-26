@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         // PUT request - update a campaign
         if (req.method === 'PUT') {
             try {
-                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt } = req.body;
+                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt, contactListIds } = req.body;
 
                 const campaign = await getCampaignById(id, userId);
 
@@ -79,6 +79,22 @@ export default async function handler(req, res) {
                 if (status) updateData.status = status;
                 if (scheduleType) updateData.scheduleType = scheduleType;
                 if (scheduledAt !== undefined) updateData.scheduledAt = scheduledAt;
+                if (contactListIds) updateData.contactListIds = contactListIds;
+
+                // If the status is changing to 'sending', you might want to trigger your email sending process
+                if (status === 'sending' && campaign.status !== 'sending') {
+                    // Add your logic to initiate the email sending process
+                    // This could be a call to your email service or adding to a queue
+
+                    // For now, we'll just update the campaign status
+                    console.log('Campaign is being sent', id);
+
+                    // You might want to update stats here or in your sending process
+                    updateData.stats = {
+                        ...campaign.stats,
+                        recipients: await getRecipientsCount(brandId, contactListIds),
+                    };
+                }
 
                 const success = await updateCampaign(id, userId, updateData);
 
@@ -91,6 +107,19 @@ export default async function handler(req, res) {
                 console.error('Error updating campaign:', error);
                 return res.status(500).json({ message: 'Error updating campaign' });
             }
+        }
+
+        // Helper function to get total recipients count
+        async function getRecipientsCount(brandId, contactListIds) {
+            if (!contactListIds || contactListIds.length === 0) return 0;
+
+            const ContactList = mongoose.models.ContactList;
+            const lists = await ContactList.find({
+                _id: { $in: contactListIds.map((id) => new mongoose.Types.ObjectId(id)) },
+                brandId: new mongoose.Types.ObjectId(brandId),
+            });
+
+            return lists.reduce((total, list) => total + (list.contactCount || 0), 0);
         }
 
         // DELETE request - delete a campaign

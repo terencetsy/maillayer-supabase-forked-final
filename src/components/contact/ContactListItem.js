@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Trash, UploadCloud, UserPlus, MoreVertical, Globe } from 'lucide-react';
+import { Users, Trash, UploadCloud, UserPlus, MoreVertical } from 'lucide-react';
 import { useState } from 'react';
 
 export default function ContactListItem({ list, brandId, onDelete, onImport }) {
@@ -43,61 +43,62 @@ export default function ContactListItem({ list, brandId, onDelete, onImport }) {
             href={`/brands/${brandId}/contacts/${list._id}`}
             className="contact-list-card"
         >
-            <div className="card-icon">
-                <Users size={24} />
+            <div className="list-icon">
+                <Users size={20} />
             </div>
-            <div className="card-content">
-                <div className="card-header">
-                    <h3>{list.name}</h3>
-                    <div className="dropdown-container">
-                        <button
-                            className="more-button"
-                            onClick={handleDropdownToggle}
-                            aria-label="More options"
-                        >
-                            <MoreVertical size={18} />
-                        </button>
 
-                        {showDropdown && (
-                            <div className="dropdown-menu">
-                                <button
-                                    className="dropdown-item"
-                                    onClick={handleImportClick('manual')}
-                                >
-                                    <UserPlus size={16} />
-                                    <span>Add Contact</span>
-                                </button>
-                                <button
-                                    className="dropdown-item"
-                                    onClick={handleImportClick('csv')}
-                                >
-                                    <UploadCloud size={16} />
-                                    <span>Import CSV</span>
-                                </button>
-                                <div className="dropdown-divider"></div>
-                                <button
-                                    className="dropdown-item delete"
-                                    onClick={handleDeleteClick}
-                                >
-                                    <Trash size={16} />
-                                    <span>Delete List</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
+            <div className="list-name">
+                <h3>{list.name}</h3>
+                {list.description && <div className="list-description">{list.description}</div>}
+            </div>
+
+            <div className="list-stats">
+                <div className="stat">
+                    <span className="value">{list.contactCount || 0}</span>
+                    <span className="label">Contacts</span>
                 </div>
+                <div className="stat">
+                    <span className="value">{formatDate(list.createdAt)}</span>
+                    <span className="label">Created</span>
+                </div>
+            </div>
 
-                {list.description && <p className="description">{list.description}</p>}
+            <div className="list-actions">
+                <div className="dropdown-container">
+                    <button
+                        className="more-button"
+                        onClick={handleDropdownToggle}
+                        aria-label="More options"
+                    >
+                        <MoreVertical size={18} />
+                    </button>
 
-                <div className="list-stats">
-                    <div className="stat">
-                        <span className="value">{list.contactCount || 0}</span>
-                        <span className="label">Contacts</span>
-                    </div>
-                    <div className="stat">
-                        <span className="value">{formatDate(list.createdAt)}</span>
-                        <span className="label">Created</span>
-                    </div>
+                    {showDropdown && (
+                        <div className="dropdown-menu">
+                            <button
+                                className="dropdown-item"
+                                onClick={handleImportClick('manual')}
+                            >
+                                <UserPlus size={16} />
+                                <span>Add Contact</span>
+                            </button>
+                            <button
+                                className="dropdown-item"
+                                onClick={handleImportClick('csv')}
+                            >
+                                <UploadCloud size={16} />
+                                <span>Import CSV</span>
+                            </button>
+                            <div className="dropdown-divider"></div>
+                            <button
+                                className="dropdown-item delete"
+                                onClick={handleDeleteClick}
+                            >
+                                <Trash size={16} />
+                                <span>Delete List</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </Link>

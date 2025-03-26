@@ -1,11 +1,9 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
-import mongoose from 'mongoose';
 import { getBrandById } from '@/services/brandService';
+import { getContactListsByBrandId, createContactList } from '@/services/contactService';
 
-// This handler would typically connect to your contact list model
-// We'll create a basic implementation here
 export default async function handler(req, res) {
     try {
         // Connect to database
@@ -37,26 +35,7 @@ export default async function handler(req, res) {
 
         // GET - Fetch all contact lists for a brand
         if (req.method === 'GET') {
-            const ContactList =
-                mongoose.models.ContactList ||
-                mongoose.model(
-                    'ContactList',
-                    new mongoose.Schema({
-                        name: String,
-                        description: String,
-                        brandId: mongoose.Schema.Types.ObjectId,
-                        userId: mongoose.Schema.Types.ObjectId,
-                        contactCount: { type: Number, default: 0 },
-                        createdAt: { type: Date, default: Date.now },
-                        updatedAt: { type: Date, default: Date.now },
-                    })
-                );
-
-            const contactLists = await ContactList.find({
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            }).sort({ createdAt: -1 });
-
+            const contactLists = await getContactListsByBrandId(brandId, userId);
             return res.status(200).json(contactLists);
         }
 
@@ -68,32 +47,13 @@ export default async function handler(req, res) {
                 return res.status(400).json({ message: 'Name is required' });
             }
 
-            const ContactList =
-                mongoose.models.ContactList ||
-                mongoose.model(
-                    'ContactList',
-                    new mongoose.Schema({
-                        name: String,
-                        description: String,
-                        brandId: mongoose.Schema.Types.ObjectId,
-                        userId: mongoose.Schema.Types.ObjectId,
-                        contactCount: { type: Number, default: 0 },
-                        createdAt: { type: Date, default: Date.now },
-                        updatedAt: { type: Date, default: Date.now },
-                    })
-                );
-
-            const contactList = new ContactList({
+            const contactList = await createContactList({
                 name,
                 description,
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
+                brandId,
+                userId,
                 contactCount: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
             });
-
-            await contactList.save();
 
             return res.status(201).json(contactList);
         }

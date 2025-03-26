@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import BrandLayout from '@/components/BrandLayout';
-import { Search, PlusCircle, Users, Upload, Globe } from 'lucide-react';
+import { PlusCircle, Users } from 'lucide-react';
 import ContactListItem from '@/components/contact/ContactListItem';
 import CreateContactListModal from '@/components/contact/CreateContactListModal';
 import ImportContactsModal from '@/components/contact/ImportContactsModal';
@@ -16,7 +16,6 @@ export default function BrandContacts() {
     const [contactLists, setContactLists] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
 
     // Modals state
     const [showCreateListModal, setShowCreateListModal] = useState(false);
@@ -120,31 +119,13 @@ export default function BrandContacts() {
         setShowImportModal(false);
     };
 
-    // Filter contact lists based on search query
-    const filteredContactLists = contactLists.filter((list) => list.name.toLowerCase().includes(searchQuery.toLowerCase()) || list.description?.toLowerCase().includes(searchQuery.toLowerCase()));
-
     if (isLoading && !brand) return null;
 
     return (
         <BrandLayout brand={brand}>
             <div className="contacts-container">
-                {/* Search and Actions Bar */}
+                {/* Header with Create Button */}
                 <div className="contacts-header">
-                    <div className="search-container">
-                        <div className="search-input-wrapper">
-                            <Search
-                                size={18}
-                                className="search-icon"
-                            />
-                            <input
-                                type="text"
-                                placeholder="Search contact lists..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="search-input"
-                            />
-                        </div>
-                    </div>
                     <button
                         className="create-button"
                         onClick={handleCreateList}
@@ -178,32 +159,17 @@ export default function BrandContacts() {
                                 </button>
                             </div>
                         ) : (
-                            <>
-                                {filteredContactLists.length === 0 ? (
-                                    <div className="empty-state search-empty">
-                                        <h2>No matching contact lists</h2>
-                                        <p>No contact lists match your search query</p>
-                                        <button
-                                            className="btn btn-secondary"
-                                            onClick={() => setSearchQuery('')}
-                                        >
-                                            Clear Search
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="contact-lists-grid">
-                                        {filteredContactLists.map((list) => (
-                                            <ContactListItem
-                                                key={list._id}
-                                                list={list}
-                                                brandId={id}
-                                                onDelete={() => handleDeleteList(list._id)}
-                                                onImport={handleImportContacts}
-                                            />
-                                        ))}
-                                    </div>
-                                )}
-                            </>
+                            <div className="contact-lists-grid">
+                                {contactLists.map((list) => (
+                                    <ContactListItem
+                                        key={list._id}
+                                        list={list}
+                                        brandId={id}
+                                        onDelete={() => handleDeleteList(list._id)}
+                                        onImport={handleImportContacts}
+                                    />
+                                ))}
+                            </div>
                         )}
                     </>
                 )}

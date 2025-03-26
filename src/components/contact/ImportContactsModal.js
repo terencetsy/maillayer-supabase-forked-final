@@ -120,6 +120,7 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
         return true;
     };
 
+    // In your ImportContactsModal.js component
     const handleManualSubmit = async (e) => {
         e.preventDefault();
 
@@ -140,7 +141,7 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                 },
                 body: JSON.stringify({
                     contacts: [manualContact],
-                    skipDuplicates: true,
+                    skipDuplicates: true, // Set to true to skip duplicates
                 }),
             });
 
@@ -150,7 +151,12 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
             }
 
             const result = await response.json();
-            setSuccess(`Contact added successfully!`);
+
+            if (result.skipped > 0) {
+                setSuccess(`Contact already exists in this list.`);
+            } else {
+                setSuccess(`Contact added successfully!`);
+            }
 
             // Clear form
             setManualContact({
@@ -166,7 +172,13 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
             }, 1500);
         } catch (error) {
             console.error('Error adding contact:', error);
-            setError(error.message || 'An unexpected error occurred');
+
+            // Check if it's a duplicate error
+            if (error.message && error.message.includes('duplicate')) {
+                setError('This email already exists in the contact list.');
+            } else {
+                setError(error.message || 'An unexpected error occurred');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -190,10 +202,10 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
     };
 
     const handleCsvImport = async () => {
-        setIsLoading(true);
-        setError('');
-
         try {
+            setIsLoading(true);
+            setError('');
+
             const response = await fetch(`/api/brands/${brandId}/contact-lists/${listId}/contacts`, {
                 method: 'POST',
                 headers: {
@@ -201,8 +213,9 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                 },
                 body: JSON.stringify({
                     contacts: parsedContacts,
-                    skipDuplicates: true,
+                    skipDuplicates: true, // Make sure this is set to true
                 }),
+                credentials: 'same-origin',
             });
 
             if (!response.ok) {
@@ -427,7 +440,6 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                     </div>
                                 </div>
                             )}
-
                             {/* Step 2: Field Mapping */}
                             {step === 2 && (
                                 <div className="field-mapping">
@@ -532,7 +544,6 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                     </div>
                                 </div>
                             )}
-
                             {/* Step 3: Review Contacts */}
                             {step === 3 && (
                                 <div className="review-contacts">
@@ -593,8 +604,6 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                     </div>
                                 </div>
                             )}
-
-                            {/* Step 4: Import Complete */}
                             {step === 4 && importResult && (
                                 <div className="import-complete">
                                     <div className="success-icon">

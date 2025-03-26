@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
-import mongoose from 'mongoose';
 import { getBrandById } from '@/services/brandService';
+import { getContactListById, updateContactList, deleteContactList } from '@/services/contactService';
 
 export default async function handler(req, res) {
     try {
@@ -33,29 +33,9 @@ export default async function handler(req, res) {
             return res.status(403).json({ message: 'Not authorized to access this brand' });
         }
 
-        // Get the contact list schema
-        const ContactList =
-            mongoose.models.ContactList ||
-            mongoose.model(
-                'ContactList',
-                new mongoose.Schema({
-                    name: String,
-                    description: String,
-                    brandId: mongoose.Schema.Types.ObjectId,
-                    userId: mongoose.Schema.Types.ObjectId,
-                    contactCount: { type: Number, default: 0 },
-                    createdAt: { type: Date, default: Date.now },
-                    updatedAt: { type: Date, default: Date.now },
-                })
-            );
-
         // GET - Fetch a specific contact list
         if (req.method === 'GET') {
-            const contactList = await ContactList.findOne({
-                _id: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
+            const contactList = await getContactListById(listId, brandId, userId);
 
             if (!contactList) {
                 return res.status(404).json({ message: 'Contact list not found' });
@@ -72,19 +52,10 @@ export default async function handler(req, res) {
                 return res.status(400).json({ message: 'Name is required' });
             }
 
-            const contactList = await ContactList.findOneAndUpdate(
-                {
-                    _id: new mongoose.Types.ObjectId(listId),
-                    brandId: new mongoose.Types.ObjectId(brandId),
-                    userId: new mongoose.Types.ObjectId(userId),
-                },
-                {
-                    name,
-                    description,
-                    updatedAt: new Date(),
-                },
-                { new: true }
-            );
+            const contactList = await updateContactList(listId, brandId, userId, {
+                name,
+                description,
+            });
 
             if (!contactList) {
                 return res.status(404).json({ message: 'Contact list not found' });
@@ -95,48 +66,11 @@ export default async function handler(req, res) {
 
         // DELETE - Delete a contact list
         if (req.method === 'DELETE') {
-            // Get the Contact schema to delete all contacts in the list
-            const Contact =
-                mongoose.models.Contact ||
-                mongoose.model(
-                    'Contact',
-                    new mongoose.Schema({
-                        email: String,
-                        firstName: String,
-                        lastName: String,
-                        phone: String,
-                        listId: mongoose.Schema.Types.ObjectId,
-                        brandId: mongoose.Schema.Types.ObjectId,
-                        userId: mongoose.Schema.Types.ObjectId,
-                        createdAt: { type: Date, default: Date.now },
-                        updatedAt: { type: Date, default: Date.now },
-                    })
-                );
+            const success = await deleteContactList(listId, brandId, userId);
 
-            // First, check if the list exists
-            const contactList = await ContactList.findOne({
-                _id: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
-
-            if (!contactList) {
+            if (!success) {
                 return res.status(404).json({ message: 'Contact list not found' });
             }
-
-            // Delete all contacts in the list
-            await Contact.deleteMany({
-                listId: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
-
-            // Delete the list itself
-            await ContactList.deleteOne({
-                _id: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
 
             return res.status(200).json({ message: 'Contact list deleted successfully' });
         }
