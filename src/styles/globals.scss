@@ -52,6 +52,8 @@ $content-max-width: 1200px;
 @import 'pages/brand-form';
 @import 'pages/campaign';
 @import 'pages/campaign-editor';
+@import 'components/toast';
+@import 'pages/contacts';
 
 * {
     box-sizing: border-box;

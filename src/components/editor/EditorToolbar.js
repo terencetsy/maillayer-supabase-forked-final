@@ -95,15 +95,21 @@ export default function EditorToolbar({ editor }) {
 
         const attrs = editor.getAttributes('image');
 
+        // Calculate aspect ratio from current dimensions
+        const aspectRatio = attrs.height / attrs.width;
+
         // Calculate new width based on size parameter
         let newWidth, newHeight;
 
         if (size === 'small') {
             newWidth = 300;
+            newHeight = Math.round(newWidth * aspectRatio);
         } else if (size === 'medium') {
             newWidth = 500;
+            newHeight = Math.round(newWidth * aspectRatio);
         } else if (size === 'large') {
             newWidth = 800;
+            newHeight = Math.round(newWidth * aspectRatio);
         } else if (size === 'reset') {
             // Reset to original size
             newWidth = null;
@@ -114,18 +120,10 @@ export default function EditorToolbar({ editor }) {
             if (customWidth === null) return; // User cancelled
             newWidth = parseInt(customWidth);
             if (isNaN(newWidth) || newWidth < 50) newWidth = 300; // Minimum width
+            newHeight = Math.round(newWidth * aspectRatio);
         }
 
-        // Set new dimensions while maintaining aspect ratio if needed
-        if (newWidth) {
-            // If we have both current width and height, maintain aspect ratio
-            if (attrs.width && attrs.height) {
-                const ratio = attrs.height / attrs.width;
-                newHeight = Math.round(newWidth * ratio);
-            }
-        }
-
-        // Update the image
+        // Update the image with maintained aspect ratio
         editor
             .chain()
             .focus()

@@ -9,6 +9,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import FontFamily from '@tiptap/extension-font-family';
 import TextStyle from '@tiptap/extension-text-style';
 import { NodeSelection } from 'prosemirror-state';
+import { uploadImageToSpaces } from '@/lib/imageUploadService';
 import EditorToolbar from './EditorToolbar';
 import { ImageUpload } from './ImageUploadExtension';
 import { ImageResize } from './ImageResizeExtension';
@@ -20,16 +21,12 @@ export default function RichTextEditor({ value = '', onChange, placeholder = 'St
     // Handle image uploads
     const handleImageUpload = async (file) => {
         try {
-            // For now, we'll just use a base64 image for demo purposes
-            // In production, you should upload to your server or cloud storage
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    resolve(e.target.result);
-                };
-                reader.readAsDataURL(file);
-            });
+            // Upload the image to DigitalOcean Spaces
+            const imageUrl = await uploadImageToSpaces(file);
+            console.log('Image uploaded successfully', 'success');
+            return imageUrl;
         } catch (error) {
+            console.log('Failed to upload image. Please try again.', 'error');
             console.error('Image upload error:', error);
             throw error;
         }

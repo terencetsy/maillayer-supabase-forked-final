@@ -151,27 +151,25 @@ export const ImageResize = Extension.create({
                             // Calculate new dimensions based on the active handle
                             let width = dragStartWidth;
                             let height = dragStartHeight;
+                            const aspectRatio = dragStartHeight / dragStartWidth;
 
-                            if (dragHandle.includes('right')) {
-                                width = Math.max(20, dragStartWidth + dx);
-                            } else if (dragHandle.includes('left')) {
-                                width = Math.max(20, dragStartWidth - dx);
-                            }
-
-                            if (dragHandle.includes('bottom')) {
-                                height = Math.max(20, dragStartHeight + dy);
-                            } else if (dragHandle.includes('top')) {
-                                height = Math.max(20, dragStartHeight - dy);
-                            }
-
-                            // Maintain aspect ratio if shift key is pressed
-                            if (event.shiftKey) {
-                                const ratio = dragStartWidth / dragStartHeight;
-                                if (dragHandle.includes('right') || dragHandle.includes('left')) {
-                                    height = Math.round(width / ratio);
-                                } else {
-                                    width = Math.round(height * ratio);
+                            // Determine which dimension to adjust based on the handle being dragged
+                            if (dragHandle.includes('right') || dragHandle.includes('left')) {
+                                // Adjusting width, calculate height based on aspect ratio
+                                if (dragHandle.includes('right')) {
+                                    width = Math.max(20, dragStartWidth + dx);
+                                } else if (dragHandle.includes('left')) {
+                                    width = Math.max(20, dragStartWidth - dx);
                                 }
+                                height = Math.round(width * aspectRatio);
+                            } else {
+                                // Adjusting height, calculate width based on aspect ratio
+                                if (dragHandle.includes('bottom')) {
+                                    height = Math.max(20, dragStartHeight + dy);
+                                } else if (dragHandle.includes('top')) {
+                                    height = Math.max(20, dragStartHeight - dy);
+                                }
+                                width = Math.round(height / aspectRatio);
                             }
 
                             // Get the current selection

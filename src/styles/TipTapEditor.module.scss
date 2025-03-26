@@ -19,6 +19,7 @@ $active-color: #3b82f6;
     background-color: $editor-bg;
     overflow: hidden;
     max-width: 100%;
+    border-radius: 8px;
 }
 
 // Toolbar styles
@@ -30,6 +31,8 @@ $active-color: #3b82f6;
     padding: 8px 12px;
     border-bottom: 1px solid $border-color;
     gap: 4px;
+    border-top-right-radius: 8px;
+    border-top-left-radius: 8px;
 }
 
 .editorLoading {

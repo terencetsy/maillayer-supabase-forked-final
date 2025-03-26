@@ -1,0 +1,1196 @@
+/* Contacts Page and Contact List Styles */
+
+// Contacts Container
+.contacts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+// Contacts Header with Search and Actions
+.contacts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+// Contact Lists Grid
+.contact-lists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+// Contact List Card
+.contact-list-card {
+    display: flex;
+    background-color: $background-secondary;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: $text-primary;
+    height: 100%;
+
+    &:hover {
+        transform: translateY(-4px);
+        border-color: $accent-color;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        background-color: rgba($accent-color, 0.1);
+        color: $accent-color;
+        flex-shrink: 0;
+    }
+
+    .card-content {
+        flex: 1;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+            transition: color 0.2s ease;
+        }
+
+        .more-button {
+            background: transparent;
+            border: none;
+            color: $text-secondary;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: $hover-color;
+                color: $text-primary;
+            }
+        }
+    }
+
+    .description {
+        font-size: 14px;
+        color: $text-secondary;
+        margin: 0 0 12px;
+        line-height: 1.4;
+        flex: 1;
+    }
+
+    .list-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: auto;
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+
+            .value {
+                font-size: 14px;
+                font-weight: 500;
+                color: $text-primary;
+            }
+
+            .label {
+                font-size: 12px;
+                color: $text-tertiary;
+            }
+        }
+    }
+}
+
+// Dropdown for Contact List Card Actions
+.dropdown-container {
+    position: relative;
+    z-index: 10;
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        width: 180px;
+        background-color: $surface-color;
+        border: 1px solid $border-color;
+        border-radius: 6px;
+        padding: 6px;
+        z-index: 10;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            color: $text-secondary;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: $hover-color;
+                color: $text-primary;
+            }
+
+            &.delete {
+                color: $danger-color;
+
+                &:hover {
+                    background-color: rgba($danger-color, 0.1);
+                }
+            }
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background-color: $border-color;
+            margin: 6px 0;
+        }
+    }
+}
+
+// Import Methods Section
+.import-methods-section {
+    margin-top: 20px;
+
+    h2 {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+
+    .import-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 16px;
+    }
+
+    .import-card {
+        background-color: $background-secondary;
+        border: 1px solid $border-color;
+        border-radius: 8px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+            transform: translateY(-4px);
+            border-color: $accent-color;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .icon-container {
+            width: 48px;
+            height: 48px;
+            background-color: rgba($accent-color, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: $accent-color;
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        p {
+            font-size: 14px;
+            color: $text-secondary;
+            margin: 0;
+        }
+    }
+}
+
+// Contact List Details Page Styles
+.contact-list-details-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: $text-secondary;
+            font-size: 14px;
+            transition: all 0.2s ease;
+
+            &:hover {
+                color: $text-primary;
+            }
+        }
+
+        .list-info {
+            h1 {
+                margin: 8px 0 4px;
+                font-size: 24px;
+                font-weight: 600;
+            }
+
+            .list-description {
+                color: $text-secondary;
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+
+            .list-stats {
+                display: flex;
+                align-items: center;
+                color: $text-tertiary;
+                font-size: 13px;
+                gap: 8px;
+            }
+        }
+    }
+}
+
+.contacts-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+
+    .search-container {
+        display: flex;
+        gap: 8px;
+        flex: 1;
+
+        .search-input-wrapper {
+            position: relative;
+            width: 320px;
+
+            .search-icon {
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: $text-tertiary;
+            }
+
+            .search-input {
+                width: 100%;
+                background-color: $background-secondary;
+                border: 1px solid $border-color;
+                border-radius: 6px;
+                padding: 8px 36px 8px 36px;
+                color: $text-primary;
+                font-size: 14px;
+                transition: all 0.2s ease;
+
+                &:focus {
+                    outline: none;
+                    border-color: $accent-color;
+                }
+
+                &::placeholder {
+                    color: $text-tertiary;
+                }
+            }
+
+            .clear-search {
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: $text-tertiary;
+                cursor: pointer;
+                padding: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    color: $text-primary;
+                }
+            }
+        }
+
+        .filter-button {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background-color: $background-secondary;
+            border: 1px solid $border-color;
+            border-radius: 6px;
+            color: $text-secondary;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: $hover-color;
+                color: $text-primary;
+            }
+        }
+    }
+
+    .actions-right {
+        display: flex;
+        gap: 8px;
+
+        .dropdown {
+            position: relative;
+
+            .dropdown-menu {
+                display: block;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                margin-top: 6px;
+                background-color: $background-secondary;
+                border: 1px solid $border-color;
+                border-radius: 6px;
+                width: 180px;
+                z-index: 10;
+                padding: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+                .dropdown-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    text-align: left;
+                    padding: 8px 12px;
+                    font-size: 14px;
+                    background: transparent;
+                    border: none;
+                    border-radius: 4px;
+                    color: $text-secondary;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+
+                    &:hover {
+                        background-color: $hover-color;
+                        color: $text-primary;
+                    }
+
+                    &.delete {
+                        color: $danger-color;
+
+                        &:hover {
+                            background-color: rgba($danger-color, 0.1);
+                        }
+                    }
+                }
+            }
+        }
+
+        .import-button,
+        .export-button,
+        .delete-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: 14px;
+            border-radius: 6px;
+            border: 1px solid $border-color;
+            background-color: $background-secondary;
+            color: $text-secondary;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                background-color: $hover-color;
+                color: $text-primary;
+            }
+
+            &:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        }
+
+        .delete-button {
+            color: $danger-color;
+
+            &:hover {
+                background-color: rgba($danger-color, 0.1);
+            }
+        }
+    }
+}
+
+// Contacts Table
+.contacts-table-container {
+    background-color: $background-secondary;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    overflow: hidden;
+
+    .table-loading,
+    .empty-contacts {
+        padding: 60px 20px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba($accent-color, 0.1);
+            border-radius: 50%;
+            border-top-color: $accent-color;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        p {
+            color: $text-secondary;
+        }
+
+        .icon-wrapper {
+            width: 64px;
+            height: 64px;
+            background-color: rgba($accent-color, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: $accent-color;
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-actions {
+            margin-top: 24px;
+        }
+    }
+
+    .contacts-table {
+        width: 100%;
+        border-collapse: collapse;
+
+        th,
+        td {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 14px;
+            border-bottom: 1px solid $border-color;
+        }
+
+        th {
+            background-color: rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            color: $text-secondary;
+
+            &.sortable {
+                cursor: pointer;
+                user-select: none;
+                transition: color 0.2s ease;
+
+                &:hover {
+                    color: $text-primary;
+                }
+
+                &.active {
+                    color: $accent-color;
+                }
+
+                .sort-icon {
+                    margin-left: 6px;
+                    display: inline-block;
+
+                    &.desc {
+                        transform: rotate(180deg);
+                    }
+                }
+            }
+        }
+
+        td {
+            color: $text-primary;
+        }
+
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+
+            input[type='checkbox'] {
+                accent-color: $accent-color;
+                width: 16px;
+                height: 16px;
+            }
+        }
+
+        .actions-cell {
+            width: 60px;
+            text-align: center;
+
+            .delete-contact-btn {
+                background: transparent;
+                border: none;
+                color: $danger-color;
+                opacity: 0.7;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    opacity: 1;
+                    background-color: rgba($danger-color, 0.1);
+                }
+            }
+        }
+    }
+}
+
+// Pagination
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+
+    .pagination-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 14px;
+        border-radius: 6px;
+        border: 1px solid $border-color;
+        background-color: transparent;
+        color: $text-secondary;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover:not(:disabled) {
+            background-color: $hover-color;
+            color: $text-primary;
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    .pagination-info {
+        font-size: 14px;
+        color: $text-secondary;
+    }
+}
+
+// Modal Styles
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modal-container {
+    background-color: $background-secondary;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid $border-color;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid $border-color;
+
+    h2 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .close-btn {
+        background: transparent;
+        border: none;
+        color: $text-secondary;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: $hover-color;
+            color: $text-primary;
+        }
+    }
+}
+
+.modal-content {
+    padding: 20px;
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        color: $text-secondary;
+        font-weight: 500;
+
+        .required {
+            color: $danger-color;
+            margin-left: 4px;
+        }
+
+        .optional {
+            color: $text-tertiary;
+            font-weight: 400;
+        }
+    }
+
+    .input-wrapper {
+        position: relative;
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            background-color: $background-primary;
+            border: 1px solid $border-color;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: $text-primary;
+            font-size: 14px;
+            transition: all 0.2s ease;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-color;
+            }
+
+            &::placeholder {
+                color: $text-tertiary;
+            }
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 8px;
+
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            .spinner {
+                animation: spin 1s linear infinite;
+            }
+        }
+
+        .btn-primary {
+            background-color: $accent-color;
+            color: white;
+            border: none;
+
+            &:hover:not(:disabled) {
+                background-color: darken($accent-color, 10%);
+            }
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: $text-secondary;
+            border: 1px solid $border-color;
+
+            &:hover:not(:disabled) {
+                background-color: $hover-color;
+                color: $text-primary;
+            }
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: $accent-color;
+            border: 1px solid $accent-color;
+
+            &:hover:not(:disabled) {
+                background-color: rgba($accent-color, 0.1);
+            }
+        }
+    }
+}
+
+// Success & Error Notifications
+.form-error,
+.form-success {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-bottom: 16px;
+
+    svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+}
+
+.form-error {
+    background-color: rgba($danger-color, 0.1);
+    border-left: 3px solid $danger-color;
+    color: lighten($danger-color, 10%);
+}
+
+.form-success {
+    background-color: rgba(#10b981, 0.1);
+    border-left: 3px solid #10b981;
+    color: lighten(#10b981, 10%);
+}
+
+// CSV Import Styles
+.csv-import-container {
+    .csv-file-upload {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+
+        .file-upload-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed $border-color;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            &:hover {
+                border-color: $accent-color;
+                background-color: rgba($accent-color, 0.03);
+            }
+
+            svg {
+                color: $text-secondary;
+                margin-bottom: 16px;
+            }
+
+            p {
+                margin: 0 0 8px;
+                color: $text-primary;
+            }
+
+            small {
+                color: $text-tertiary;
+                font-size: 13px;
+            }
+
+            &.has-file {
+                border-style: solid;
+                border-color: $accent-color;
+                background-color: rgba($accent-color, 0.05);
+                padding: 20px;
+
+                .file-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+
+                    svg {
+                        color: $accent-color;
+                        margin-bottom: 0;
+                    }
+
+                    .file-details {
+                        text-align: left;
+
+                        .file-name {
+                            font-weight: 500;
+                            margin-bottom: 4px;
+                        }
+
+                        .file-size {
+                            font-size: 13px;
+                            color: $text-secondary;
+                        }
+                    }
+                }
+            }
+        }
+
+        .csv-template-info {
+            text-align: center;
+            color: $text-secondary;
+            font-size: 14px;
+
+            a {
+                color: $accent-color;
+                text-decoration: underline;
+
+                &:hover {
+                    text-decoration: none;
+                }
+            }
+        }
+    }
+
+    .field-mapping {
+        .mapping-info {
+            margin-bottom: 20px;
+            color: $text-secondary;
+        }
+
+        select {
+            width: 100%;
+            background-color: $background-primary;
+            border: 1px solid $border-color;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: $text-primary;
+            font-size: 14px;
+            margin-top: 6px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255, 255, 255, 0.5)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: calc(100% - 12px) center;
+            padding-right: 36px;
+
+            &:focus {
+                outline: none;
+                border-color: $accent-color;
+            }
+
+            option {
+                background-color: $background-primary;
+            }
+        }
+    }
+
+    .review-contacts {
+        .review-info {
+            margin-bottom: 20px;
+            color: $text-secondary;
+        }
+
+        .contacts-preview {
+            background-color: $background-primary;
+            border: 1px solid $border-color;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 24px;
+
+            .preview-table {
+                width: 100%;
+                border-collapse: collapse;
+
+                th,
+                td {
+                    padding: 10px 12px;
+                    text-align: left;
+                    font-size: 14px;
+                    border-bottom: 1px solid $border-color;
+                }
+
+                th {
+                    background-color: rgba(0, 0, 0, 0.2);
+                    font-weight: 600;
+                    color: $text-secondary;
+                }
+
+                td {
+                    color: $text-primary;
+                }
+            }
+
+            .more-contacts {
+                padding: 10px 12px;
+                text-align: center;
+                font-size: 13px;
+                color: $text-secondary;
+                background-color: rgba(0, 0, 0, 0.2);
+            }
+        }
+    }
+
+    .import-complete {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 20px 0;
+
+        .success-icon {
+            color: #10b981;
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .import-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 24px;
+
+            .stat-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 12px;
+                border-bottom: 1px solid $border-color;
+
+                &:last-child {
+                    border-bottom: none;
+                }
+
+                .stat-label {
+                    font-size: 14px;
+                    color: $text-secondary;
+                }
+
+                .stat-value {
+                    font-size: 16px;
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+}
+
+// API Integration Styles
+.api-description {
+    margin-bottom: 24px;
+
+    p {
+        color: $text-secondary;
+        line-height: 1.5;
+    }
+}
+
+.webhook-info {
+    background-color: $background-primary;
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 24px 0;
+
+    h4 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }
+
+    p {
+        color: $text-secondary;
+        margin-bottom: 16px;
+        font-size: 14px;
+    }
+
+    pre {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 12px;
+        border-radius: 4px;
+        overflow-x: auto;
+        color: #a6accd;
+        font-family: monospace;
+        font-size: 13px;
+    }
+}
+
+.input-help {
+    font-size: 13px;
+    color: $text-tertiary;
+    margin-top: 6px;
+}
+
+// Responsive Media Queries
+@media (max-width: 768px) {
+    .contact-lists-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .contacts-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+
+        .search-container {
+            flex-direction: column;
+
+            .search-input-wrapper {
+                width: 100%;
+            }
+        }
+
+        .actions-right {
+            justify-content: space-between;
+        }
+    }
+
+    .contacts-table {
+        th,
+        td {
+            padding: 10px 8px;
+            font-size: 13px;
+        }
+    }
+
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+// Print Styles
+@media print {
+    .contacts-table-container {
+        background-color: white;
+        color: black;
+        border: none;
+
+        .contacts-table {
+            th,
+            td {
+                color: black;
+                border-color: #ccc;
+            }
+
+            th {
+                background-color: #f5f5f5;
+            }
+
+            .checkbox-cell,
+            .actions-cell {
+                display: none;
+            }
+        }
+    }
+
+    .contacts-actions,
+    .pagination,
+    .back-link {
+        display: none;
+    }
+
+    .list-info h1 {
+        color: black;
+        font-size: 20px;
+    }
+
+    .list-description,
+    .list-stats {
+        color: #555;
+    }
+}
