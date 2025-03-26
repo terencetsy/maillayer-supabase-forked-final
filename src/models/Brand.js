@@ -35,6 +35,11 @@ const BrandSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        fromName: {
+            type: String,
+            trim: true,
+            default: '',
+        },
         fromEmail: {
             type: String,
             trim: true,
