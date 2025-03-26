@@ -62,8 +62,8 @@ export default function BrandLayout({ children, brand }) {
                         <div className="brand-logo">
                             <div className="logo-icon"></div>
                             <div className="brand-info">
-                                <div className="brand-name">Iconbuddy</div>
-                                <div className="brand-email">hello@iconbuddy.com</div>
+                                <div className="brand-name">{brand.name}</div>
+                                <div className="brand-email">{brand.website}</div>
                             </div>
                         </div>
                     </div>

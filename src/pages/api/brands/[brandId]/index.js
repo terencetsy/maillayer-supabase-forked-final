@@ -58,7 +58,7 @@ export default async function handler(req, res) {
                     return res.status(403).json({ message: 'Not authorized to update this brand' });
                 }
 
-                const { name, awsRegion, awsAccessKey, awsSecretKey, sendingDomain, fromEmail, replyToEmail, status } = req.body;
+                const { name, awsRegion, awsAccessKey, awsSecretKey, sendingDomain, fromName, fromEmail, replyToEmail, status } = req.body;
 
                 const updateData = {};
 
@@ -67,6 +67,7 @@ export default async function handler(req, res) {
                 if (awsAccessKey) updateData.awsAccessKey = awsAccessKey;
                 if (awsSecretKey) updateData.awsSecretKey = awsSecretKey;
                 if (sendingDomain) updateData.sendingDomain = sendingDomain;
+                if (fromName) updateData.fromName = fromName;
                 if (fromEmail) updateData.fromEmail = fromEmail;
                 if (replyToEmail) updateData.replyToEmail = replyToEmail;
                 if (status) updateData.status = status;

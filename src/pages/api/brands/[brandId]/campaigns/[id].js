@@ -3,6 +3,8 @@ import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
 import { getCampaignById, updateCampaign, deleteCampaign } from '@/services/campaignService';
 import { getBrandById } from '@/services/brandService';
+import mongoose from 'mongoose'; // Make sure this import is present
+import { emailCampaignQueue, schedulerQueue } from '@/lib/queue';
 
 export default async function handler(req, res) {
     try {
@@ -22,7 +24,7 @@ export default async function handler(req, res) {
         if (!brandId || !id) {
             return res.status(400).json({ message: 'Missing required parameters' });
         }
-
+        console.log(brandId);
         // Check if the brand belongs to the user
         const brand = await getBrandById(brandId);
         if (!brand) {
@@ -76,24 +78,95 @@ export default async function handler(req, res) {
                 if (fromName) updateData.fromName = fromName;
                 if (fromEmail) updateData.fromEmail = fromEmail;
                 if (replyTo) updateData.replyTo = replyTo;
-                if (status) updateData.status = status;
-                if (scheduleType) updateData.scheduleType = scheduleType;
-                if (scheduledAt !== undefined) updateData.scheduledAt = scheduledAt;
                 if (contactListIds) updateData.contactListIds = contactListIds;
+                console.log(brand);
+                // Sending or scheduling functionality
+                if (status === 'sending' || status === 'scheduled') {
+                    // Check if SES details exist in the brand
+                    if (brand.status !== 'active') {
+                        return res.status(400).json({ message: 'AWS SES credentials not configured for this brand' });
+                    }
 
-                // If the status is changing to 'sending', you might want to trigger your email sending process
-                if (status === 'sending' && campaign.status !== 'sending') {
-                    // Add your logic to initiate the email sending process
-                    // This could be a call to your email service or adding to a queue
+                    // Handle scheduled campaigns
+                    if (scheduleType === 'schedule' && scheduledAt) {
+                        // Set the campaign to scheduled status
+                        updateData.status = 'scheduled';
+                        updateData.scheduleType = scheduleType;
+                        updateData.scheduledAt = new Date(scheduledAt);
 
-                    // For now, we'll just update the campaign status
-                    console.log('Campaign is being sent', id);
+                        // Create a delay until the scheduled time
+                        const now = new Date();
+                        const scheduledTime = new Date(scheduledAt);
+                        const delay = Math.max(0, scheduledTime.getTime() - now.getTime());
 
-                    // You might want to update stats here or in your sending process
-                    updateData.stats = {
-                        ...campaign.stats,
-                        recipients: await getRecipientsCount(brandId, contactListIds),
-                    };
+                        // Add to the scheduler queue
+                        await schedulerQueue.add(
+                            'process-scheduled-campaign',
+                            {
+                                campaignId: campaign._id.toString(),
+                                brandId: brandId.toString(),
+                                userId: userId,
+                                contactListIds: contactListIds || campaign.contactListIds,
+                                fromName: fromName || campaign.fromName || brand.fromName,
+                                fromEmail: fromEmail || campaign.fromEmail || brand.fromEmail,
+                                replyTo: replyTo || campaign.replyTo || campaign.fromEmail,
+                                subject: subject || campaign.subject,
+                            },
+                            {
+                                delay,
+                                jobId: `scheduled-campaign-${campaign._id}-${Date.now()}`,
+                                attempts: 3,
+                                backoff: {
+                                    type: 'exponential',
+                                    delay: 5000,
+                                },
+                                removeOnComplete: false,
+                            }
+                        );
+                    }
+                    // Handle immediate sending
+                    else if (status === 'sending') {
+                        // Update status to queued
+                        updateData.status = 'queued';
+                        updateData.sentAt = new Date();
+
+                        // Add to processing queue with comprehensive data
+                        await emailCampaignQueue.add(
+                            'send-campaign',
+                            {
+                                campaignId: campaign._id.toString(),
+                                brandId: brandId.toString(),
+                                userId: userId,
+                                contactListIds: (contactListIds || campaign.contactListIds).map((id) => id.toString()),
+                                fromName: fromName || campaign.fromName || brand.fromName,
+                                fromEmail: fromEmail || campaign.fromEmail || brand.fromEmail,
+                                replyTo: replyTo || campaign.replyTo || campaign.fromEmail,
+                                subject: subject || campaign.subject,
+                                // Use brand SES credentials directly since there's no EmailServiceAccount
+                                brandAwsRegion: brand.awsRegion,
+                                brandAwsAccessKey: brand.awsAccessKey,
+                                brandAwsSecretKey: brand.awsSecretKey,
+                            },
+                            {
+                                jobId: `campaign-${campaign._id}-${Date.now()}`,
+                                attempts: 3,
+                                backoff: {
+                                    type: 'exponential',
+                                    delay: 5000,
+                                },
+                                removeOnComplete: false,
+                            }
+                        );
+
+                        // Update stats with recipient count
+                        updateData.stats = {
+                            ...campaign.stats,
+                            recipients: await getRecipientsCount(brandId, contactListIds || campaign.contactListIds),
+                        };
+                    }
+                } else if (status) {
+                    // For other status updates that aren't sending or scheduling
+                    updateData.status = status;
                 }
 
                 const success = await updateCampaign(id, userId, updateData);

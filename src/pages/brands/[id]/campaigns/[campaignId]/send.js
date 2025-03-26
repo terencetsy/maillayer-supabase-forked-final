@@ -138,8 +138,8 @@ export default function SendCampaign() {
         }
     };
 
+    // Example code for your SendCampaign.js component
     const handleSendCampaign = async () => {
-        // Validate
         if (selectedLists.length === 0) {
             setError('Please select at least one contact list');
             return;
@@ -171,10 +171,14 @@ export default function SendCampaign() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    status: scheduleType === 'send_now' ? 'sending' : 'scheduled',
+                    // Include all necessary campaign data
+                    status: scheduleType === 'schedule' ? 'scheduled' : 'sending',
                     scheduleType,
                     scheduledAt,
                     contactListIds: selectedLists,
+                    fromName: brand.fromName,
+                    fromEmail: brand.fromEmail,
+                    replyTo: brand.replyToEmail,
                 }),
                 credentials: 'same-origin',
             });
@@ -222,7 +226,6 @@ export default function SendCampaign() {
             </BrandLayout>
         );
     }
-
     return (
         <BrandLayout brand={brand}>
             <div className="send-campaign-container">
