@@ -76,7 +76,7 @@ export default function BrandForm({ onCancel, onSuccess }) {
                 </button>
             </div>
 
-            <p className="form-description">Let's start by setting up your brand. You can configure email sending later.</p>
+            <p className="form-description">Let&apos; start by setting up your brand. You can configure email sending later.</p>
 
             {error && (
                 <div className="form-error">

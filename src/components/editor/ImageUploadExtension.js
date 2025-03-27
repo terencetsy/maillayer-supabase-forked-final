@@ -12,7 +12,7 @@ export const ImageUpload = Extension.create({
     },
 
     addProseMirrorPlugins() {
-        // Store the upload function from options so it's available in the plugin
+        // Store the upload function from options so it&apos; available in the plugin
         const uploadImageFunc = this.options.uploadImage;
 
         return [

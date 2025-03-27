@@ -185,12 +185,12 @@ export default function RichTextEditor({ value = '', onChange, placeholder = 'St
 
     // Handle drag and drop behaviors for better user experience
     const handleDrop = (e) => {
-        // Editor's extensions will handle the drop event
+        // Editor&apos; extensions will handle the drop event
     };
 
     // Handle paste events
     const handlePaste = (e) => {
-        // Editor's extensions will handle the paste event
+        // Editor&apos; extensions will handle the paste event
     };
 
     if (!isMounted) {

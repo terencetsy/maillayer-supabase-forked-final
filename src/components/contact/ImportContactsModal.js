@@ -173,7 +173,7 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
         } catch (error) {
             console.error('Error adding contact:', error);
 
-            // Check if it's a duplicate error
+            // Check if it&apos; a duplicate error
             if (error.message && error.message.includes('duplicate')) {
                 setError('This email already exists in the contact list.');
             } else {

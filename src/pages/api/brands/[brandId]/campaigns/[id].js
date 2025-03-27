@@ -142,7 +142,7 @@ export default async function handler(req, res) {
                                 fromEmail: fromEmail || campaign.fromEmail || brand.fromEmail,
                                 replyTo: replyTo || campaign.replyTo || campaign.fromEmail,
                                 subject: subject || campaign.subject,
-                                // Use brand SES credentials directly since there's no EmailServiceAccount
+                                // Use brand SES credentials directly since there&apos; no EmailServiceAccount
                                 brandAwsRegion: brand.awsRegion,
                                 brandAwsAccessKey: brand.awsAccessKey,
                                 brandAwsSecretKey: brand.awsSecretKey,

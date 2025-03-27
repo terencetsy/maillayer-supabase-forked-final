@@ -30,7 +30,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
 
-        // Create user - let the model's pre-save hook handle password hashing
+        // Create user - let the model&apos; pre-save hook handle password hashing
         try {
             const user = new User({
                 name,

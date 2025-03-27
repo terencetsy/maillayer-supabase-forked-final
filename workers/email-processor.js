@@ -242,7 +242,7 @@ function decryptData(encryptedText, secretKey) {
     try {
         if (!encryptedText) return null;
 
-        // If it's not encrypted or contains ":", just return it as is
+        // If it&apos; not encrypted or contains ":", just return it as is
         if (!encryptedText.includes(':')) {
             return encryptedText;
         }

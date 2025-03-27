@@ -155,7 +155,7 @@ export default function BrandVerification() {
         setSuccess('');
 
         try {
-            // Only send the secret key if it's not masked
+            // Only send the secret key if it&apos; not masked
             const payload = {
                 awsRegion,
                 awsAccessKey,

@@ -180,7 +180,7 @@ export async function addContactsToList(listId, brandId, userId, contacts, skipD
     importResult.skipped = duplicateContacts.length;
 
     // If skipDuplicates is true, we'll add only the new contacts
-    // If it's false and there are duplicates, we'll throw an error
+    // If it&apos; false and there are duplicates, we'll throw an error
     if (!skipDuplicates && duplicateContacts.length > 0) {
         throw {
             code: 11000,

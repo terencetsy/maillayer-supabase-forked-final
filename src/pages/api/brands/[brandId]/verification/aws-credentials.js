@@ -72,7 +72,7 @@ export default async function handler(req, res) {
             updateData.awsSecretKey = awsSecretKey;
         }
 
-        // Update brand status if it's still in initial state
+        // Update brand status if it&apos; still in initial state
         if (brand.status === 'pending_setup') {
             updateData.status = 'pending_verification';
         }

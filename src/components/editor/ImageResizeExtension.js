@@ -69,7 +69,7 @@ export const ImageResize = Extension.create({
                                 createResizeHandles(view, node, from);
                                 selectedImage = { node, pos: from };
                             } else {
-                                // Remove resize handles if there's no selected image
+                                // Remove resize handles if there&apos; no selected image
                                 removeResizeHandles(view);
                                 selectedImage = null;
                             }

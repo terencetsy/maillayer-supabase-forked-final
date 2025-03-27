@@ -5,14 +5,20 @@ WORKDIR /app
 # Install PM2
 RUN npm install -g pm2
 
-# Copy everything
+# Copy the application
 COPY . .
 
-# Install all dependencies
+# Install dependencies
 RUN npm install
 
-# Build Next.js app
-RUN NODE_ENV=production npm run build
+# Try to build with error logging
+RUN npm run build || (echo "BUILD ERROR DETAILS:" && cat /root/.npm/_logs/*-debug-0.log && false)
 
-# Start Next.js and workers with PM2
+# Make worker scripts executable
+RUN chmod +x workers/*.js
+
+# Expose the port Next.js runs on
+EXPOSE 3000
+
+# Start the application using PM2
 CMD ["npm", "run", "pm2:start"]
