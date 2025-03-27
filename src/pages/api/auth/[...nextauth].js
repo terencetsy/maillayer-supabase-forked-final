@@ -2,6 +2,12 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
+import config from '@/lib/config';
+
+// Set NEXTAUTH_URL if not already set (important for server-side operations)
+if (!process.env.NEXTAUTH_URL && typeof window === 'undefined') {
+    process.env.NEXTAUTH_URL = config.baseUrl;
+}
 
 export const authOptions = {
     providers: [
@@ -57,8 +63,10 @@ export const authOptions = {
         strategy: 'jwt',
         maxAge: 30 * 24 * 60 * 60, // 30 days
     },
-    secret: process.env.NEXTAUTH_SECRET,
-    debug: process.env.NODE_ENV === 'development',
+    // Use the secret from our centralized config
+    secret: config.nextAuthSecret,
+    // Use the environment flag from our config for debug mode
+    debug: config.isDevelopment,
 };
 
 export default NextAuth(authOptions);

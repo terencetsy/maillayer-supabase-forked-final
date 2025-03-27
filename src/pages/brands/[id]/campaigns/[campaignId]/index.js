@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
 import { Edit, ArrowLeft, Send } from 'lucide-react';
+import CampaignStats from '@/components/campaign/CampaignStats';
 
 export default function CampaignDetail() {
     const { data: session, status } = useSession();
@@ -180,6 +181,15 @@ export default function CampaignDetail() {
                         ></div>
                     </div>
                 </div>
+
+                {campaign.status === 'sent' && (
+                    <div className="campaign-stats-section">
+                        <CampaignStats
+                            brandId={id}
+                            campaignId={campaignId}
+                        />
+                    </div>
+                )}
             </div>
         </BrandLayout>
     );

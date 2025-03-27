@@ -1,6 +1,11 @@
 import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
 import '../styles/globals.scss';
+import config from '@/lib/config';
+
+if (typeof window === 'undefined' && !process.env.NEXTAUTH_URL) {
+    process.env.NEXTAUTH_URL = config.baseUrl;
+}
 
 function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     return (

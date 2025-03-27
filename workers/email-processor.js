@@ -1,4 +1,4 @@
-// workers/email-processor.js
+// workers/email-processor-with-tracking.js
 require('dotenv').config();
 const Bull = require('bull');
 const mongoose = require('mongoose');
@@ -6,6 +6,8 @@ const AWS = require('aws-sdk');
 const path = require('path');
 const crypto = require('crypto');
 const { RateLimiter } = require('limiter');
+const cheerio = require('cheerio');
+const config = require('../src/lib/configCommonJS');
 
 // Setup Redis connection for Bull
 const redisOptions = {
@@ -36,98 +38,95 @@ const schedulerQueue = new Bull('campaign-scheduler', {
     },
 });
 
-// We need to define models here because the models in src/models use ES Module syntax
-// which isn't compatible with CommonJS require() without special configuration
-const CampaignSchema = new mongoose.Schema(
-    {
-        name: String,
-        subject: String,
-        content: String,
-        brandId: mongoose.Schema.Types.ObjectId,
-        userId: mongoose.Schema.Types.ObjectId,
-        fromName: String,
-        fromEmail: String,
-        replyTo: String,
-        status: {
-            type: String,
-            enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed', 'paused'],
-            default: 'draft',
-        },
-        contactListIds: [mongoose.Schema.Types.ObjectId],
-        scheduleType: String,
-        scheduledAt: Date,
-        sentAt: Date,
-        stats: {
-            recipients: { type: Number, default: 0 },
-            opens: { type: Number, default: 0 },
-            clicks: { type: Number, default: 0 },
-            bounces: { type: Number, default: 0 },
-            complaints: { type: Number, default: 0 },
-            processed: { type: Number, default: 0 },
-        },
-        processingMetadata: {
-            lastProcessedContactIndex: { type: Number, default: 0 },
-            lastProcessedListIndex: { type: Number, default: 0 },
-            hasMoreToProcess: { type: Boolean, default: true },
-            processingStartedAt: Date,
-            processedBatches: { type: Number, default: 0 },
-        },
-        createdAt: { type: Date, default: Date.now },
-        updatedAt: { type: Date, default: Date.now },
-    },
-    {
-        collection: 'campaigns', // Explicitly specify collection name
-    }
-);
+// These variables will hold our models after connecting to MongoDB
+let Campaign;
+let Contact;
+let Brand;
 
-const ContactSchema = new mongoose.Schema(
+function generateTrackingToken(campaignId, contactId, email) {
+    // Create a string to hash
+    const dataToHash = `${campaignId}:${contactId}:${email}:${process.env.TRACKING_SECRET || 'tracking-secret-key'}`;
+
+    // Generate SHA-256 hash
+    return crypto.createHash('sha256').update(dataToHash).digest('hex');
+}
+
+function processHtml(html, campaignId, contactId, email, trackingDomain = '') {
+    // Fallback to using the API routes if tracking domain is not provided
+    const domain = trackingDomain || process.env.TRACKING_DOMAIN || '';
+
+    // Generate tracking token
+    const token = generateTrackingToken(campaignId, contactId, email);
+
+    // Base tracking parameters
+    const trackingParams = `cid=${encodeURIComponent(campaignId)}&lid=${encodeURIComponent(contactId)}&e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`;
+
+    // Parse HTML
+    const $ = cheerio.load(html);
+
+    // Process all links to add click tracking
+    $('a').each(function () {
+        const originalUrl = $(this).attr('href');
+        if (originalUrl && !originalUrl.startsWith('mailto:') && !originalUrl.startsWith('#')) {
+            const trackingUrl = `${domain}/api/tracking/click?${trackingParams}&url=${encodeURIComponent(originalUrl)}`;
+            $(this).attr('href', trackingUrl);
+        }
+    });
+
+    // Add tracking pixel at the end of the email
+    const trackingPixel = `<img src="${domain}/api/tracking/open?${trackingParams}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
+    $('body').append(trackingPixel);
+
+    // Return the modified HTML
+    return $.html();
+}
+
+function extractTextFromHtml(html) {
+    if (!html) return '';
+
+    // Use cheerio to remove scripts, styles, and extract text
+    const $ = cheerio.load(html);
+
+    // Remove scripts and styles
+    $('script, style').remove();
+
+    // Get the text content
+    let text = $('body').text();
+
+    // Clean up white space
+    text = text.replace(/\s+/g, ' ').trim();
+
+    return text;
+}
+
+// Define schema for campaign-specific stats collections
+const TrackingEventSchema = new mongoose.Schema(
     {
+        contactId: mongoose.Schema.Types.ObjectId,
+        campaignId: mongoose.Schema.Types.ObjectId,
         email: String,
-        firstName: String,
-        lastName: String,
-        phone: String,
-        listId: mongoose.Schema.Types.ObjectId,
-        brandId: mongoose.Schema.Types.ObjectId,
-        userId: mongoose.Schema.Types.ObjectId,
-        status: {
-            type: String,
-            default: 'active',
+        userAgent: String,
+        ipAddress: String,
+        timestamp: {
+            type: Date,
+            default: Date.now,
         },
-        createdAt: { type: Date, default: Date.now },
-        updatedAt: { type: Date, default: Date.now },
+        eventType: {
+            type: String,
+            enum: ['open', 'click', 'bounce', 'complaint', 'delivery'],
+        },
+        metadata: mongoose.Schema.Types.Mixed,
     },
     {
-        collection: 'contacts', // Explicitly specify collection name
+        timestamps: true,
     }
 );
 
-const BrandSchema = new mongoose.Schema(
-    {
-        name: String,
-        website: String,
-        userId: mongoose.Schema.Types.ObjectId,
-        awsRegion: String,
-        awsAccessKey: String,
-        awsSecretKey: String,
-        sendingDomain: String,
-        fromName: String,
-        fromEmail: String,
-        replyToEmail: String,
-        status: {
-            type: String,
-            enum: ['active', 'inactive', 'pending_setup', 'pending_verification'],
-            default: 'pending_setup',
-        },
-        createdAt: { type: Date, default: Date.now },
-        updatedAt: { type: Date, default: Date.now },
-    },
-    {
-        collection: 'brands', // Explicitly specify collection name
-    }
-);
-
-// Create models
-let Campaign, Contact, Brand;
+// Function to create or get model for campaign-specific stats
+function createTrackingModel(campaignId) {
+    const collectionName = `stats_${campaignId}`;
+    return mongoose.models[collectionName] || mongoose.model(collectionName, TrackingEventSchema, collectionName);
+}
 
 // Connect to MongoDB
 async function connectDB() {
@@ -138,10 +137,100 @@ async function connectDB() {
         });
         console.log('MongoDB connected');
 
-        // Initialize models
+        // Define schemas
+        const CampaignSchema = new mongoose.Schema(
+            {
+                name: String,
+                subject: String,
+                content: String,
+                brandId: mongoose.Schema.Types.ObjectId,
+                userId: mongoose.Schema.Types.ObjectId,
+                fromName: String,
+                fromEmail: String,
+                replyTo: String,
+                status: {
+                    type: String,
+                    enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed', 'paused'],
+                    default: 'draft',
+                },
+                contactListIds: [mongoose.Schema.Types.ObjectId],
+                scheduleType: String,
+                scheduledAt: Date,
+                sentAt: Date,
+                stats: {
+                    recipients: { type: Number, default: 0 },
+                    opens: { type: Number, default: 0 },
+                    clicks: { type: Number, default: 0 },
+                    bounces: { type: Number, default: 0 },
+                    complaints: { type: Number, default: 0 },
+                    processed: { type: Number, default: 0 },
+                },
+                processingMetadata: {
+                    lastProcessedContactIndex: { type: Number, default: 0 },
+                    lastProcessedListIndex: { type: Number, default: 0 },
+                    hasMoreToProcess: { type: Boolean, default: true },
+                    processingStartedAt: Date,
+                    processedBatches: { type: Number, default: 0 },
+                },
+            },
+            {
+                collection: 'campaigns',
+            }
+        );
+
+        const ContactSchema = new mongoose.Schema(
+            {
+                email: String,
+                firstName: String,
+                lastName: String,
+                phone: String,
+                listId: mongoose.Schema.Types.ObjectId,
+                brandId: mongoose.Schema.Types.ObjectId,
+                userId: mongoose.Schema.Types.ObjectId,
+                status: {
+                    type: String,
+                    default: 'active',
+                },
+            },
+            {
+                collection: 'contacts',
+            }
+        );
+
+        const BrandSchema = new mongoose.Schema(
+            {
+                name: String,
+                website: String,
+                userId: mongoose.Schema.Types.ObjectId,
+                awsRegion: String,
+                awsAccessKey: String,
+                awsSecretKey: String,
+                sendingDomain: String,
+                fromName: String,
+                fromEmail: String,
+                replyToEmail: String,
+                status: {
+                    type: String,
+                    enum: ['active', 'inactive', 'pending_setup', 'pending_verification'],
+                    default: 'pending_setup',
+                },
+            },
+            {
+                collection: 'brands',
+            }
+        );
+
+        // Initialize models - make sure they're properly initialized before using them
         Campaign = mongoose.models.Campaign || mongoose.model('Campaign', CampaignSchema);
         Contact = mongoose.models.Contact || mongoose.model('Contact', ContactSchema);
         Brand = mongoose.models.Brand || mongoose.model('Brand', BrandSchema);
+
+        // Make sure models are defined
+        console.log('Models initialized:', {
+            Campaign: !!Campaign,
+            Contact: !!Contact,
+            Brand: !!Brand,
+        });
     } catch (error) {
         console.error('MongoDB connection error:', error);
         process.exit(1);
@@ -241,16 +330,114 @@ schedulerQueue.process('process-scheduled-campaign', async (job) => {
     }
 });
 
-// Complete send-campaign handler for email-processor.js
+// Handle SES bounce and complaint notifications
+async function handleSESNotification(notification) {
+    if (!notification || !notification.notificationType) {
+        return;
+    }
+
+    console.log('Received SES notification:', notification.notificationType);
+
+    try {
+        switch (notification.notificationType) {
+            case 'Bounce': {
+                const { bounce } = notification;
+                if (!bounce || !bounce.bouncedRecipients) {
+                    return;
+                }
+
+                // Process each bounced recipient
+                for (const recipient of bounce.bouncedRecipients) {
+                    if (!recipient.emailAddress) continue;
+
+                    // Find campaigns that were sent to this email
+                    const contacts = await Contact.find({ email: recipient.emailAddress });
+
+                    for (const contact of contacts) {
+                        // Use regex to find campaign ID in message ID
+                        const campaignMatches = bounce.bounceSubType && bounce.bounceSubType.match(/campaign-([a-f0-9]+)/i);
+                        if (campaignMatches && campaignMatches[1]) {
+                            const campaignId = campaignMatches[1];
+
+                            // Track the bounce event
+                            const TrackingModel = createTrackingModel(campaignId);
+                            await TrackingModel.create({
+                                contactId: contact._id,
+                                campaignId,
+                                email: recipient.emailAddress,
+                                eventType: 'bounce',
+                                metadata: {
+                                    bounceType: bounce.bounceType,
+                                    bounceSubType: bounce.bounceSubType,
+                                    diagnosticCode: recipient.diagnosticCode,
+                                },
+                            });
+
+                            // Update campaign stats
+                            await Campaign.updateOne({ _id: campaignId }, { $inc: { 'stats.bounces': 1 } });
+                        }
+                    }
+                }
+                break;
+            }
+
+            case 'Complaint': {
+                const { complaint } = notification;
+                if (!complaint || !complaint.complainedRecipients) {
+                    return;
+                }
+
+                // Similar process for complaints
+                for (const recipient of complaint.complainedRecipients) {
+                    if (!recipient.emailAddress) continue;
+
+                    const contacts = await Contact.find({ email: recipient.emailAddress });
+
+                    for (const contact of contacts) {
+                        // Use regex to find campaign ID in message ID
+                        const campaignMatches = complaint.complaintSubType && complaint.complaintSubType.match(/campaign-([a-f0-9]+)/i);
+                        if (campaignMatches && campaignMatches[1]) {
+                            const campaignId = campaignMatches[1];
+
+                            // Track the complaint event
+                            const TrackingModel = createTrackingModel(campaignId);
+                            await TrackingModel.create({
+                                contactId: contact._id,
+                                campaignId,
+                                email: recipient.emailAddress,
+                                eventType: 'complaint',
+                                metadata: {
+                                    userAgent: complaint.userAgent,
+                                    complaintFeedbackType: complaint.complaintFeedbackType,
+                                },
+                            });
+
+                            // Update campaign stats
+                            await Campaign.updateOne({ _id: campaignId }, { $inc: { 'stats.complaints': 1 } });
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    } catch (error) {
+        console.error('Error processing SES notification:', error);
+    }
+}
+
+// Complete send-campaign handler with email tracking
 emailCampaignQueue.process('send-campaign', async (job) => {
     const { campaignId, brandId, userId, contactListIds, fromName, fromEmail, replyTo, subject, brandAwsRegion, brandAwsAccessKey, brandAwsSecretKey } = job.data;
 
     try {
         console.log(`Starting to process campaign: ${campaignId}`);
 
-        // Get campaign details
-        const campaign = await Campaign.findById(campaignId);
+        // Get campaign details - make sure Campaign model is defined
+        if (!Campaign) {
+            throw new Error('Campaign model is not initialized');
+        }
 
+        const campaign = await Campaign.findById(campaignId);
         if (!campaign) {
             throw new Error(`Campaign not found: ${campaignId}`);
         }
@@ -271,6 +458,10 @@ emailCampaignQueue.process('send-campaign', async (job) => {
         job.progress(10);
 
         // Get brand
+        if (!Brand) {
+            throw new Error('Brand model is not initialized');
+        }
+
         const brand = await Brand.findById(brandId);
         if (!brand) {
             throw new Error(`Brand not found: ${brandId}`);
@@ -290,6 +481,13 @@ emailCampaignQueue.process('send-campaign', async (job) => {
 
         job.progress(15);
 
+        // Create tracking model for this campaign
+        // This ensures the collection exists before we start sending emails
+        createTrackingModel(campaignId);
+
+        // Define tracking domain for links and pixels
+        const trackingDomain = config.trackingDomain;
+
         // Check quota and verify connection
         try {
             const quotaResponse = await ses.getSendQuota().promise();
@@ -299,6 +497,10 @@ emailCampaignQueue.process('send-campaign', async (job) => {
             console.log(`SES Quota - Max: ${quotaResponse.Max24HourSend}, Used: ${quotaResponse.SentLast24Hours}, Remaining: ${remainingQuota}`);
 
             // Get an estimate of contacts to be processed
+            if (!Contact) {
+                throw new Error('Contact model is not initialized');
+            }
+
             let totalContactsEstimate = 0;
             for (const listId of contactListIds) {
                 const count = await Contact.countDocuments({
@@ -372,12 +574,21 @@ emailCampaignQueue.process('send-campaign', async (job) => {
                         let successCount = 0;
                         let failureCount = 0;
 
+                        // Track successful deliveries for the tracking collection
+                        const deliveryEvents = [];
+
                         // Process each contact in batch
                         for (const contact of batchContacts) {
                             // Wait for rate limiter token
                             await limiter.removeTokens(1);
 
                             try {
+                                // Add tracking to HTML content
+                                const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain);
+
+                                // Extract plain text for text-only clients
+                                const textContent = extractTextFromHtml(processedHtml);
+
                                 // Send the email to this contact
                                 const result = await ses
                                     .sendEmail({
@@ -391,21 +602,44 @@ emailCampaignQueue.process('send-campaign', async (job) => {
                                             },
                                             Body: {
                                                 Html: {
-                                                    Data: campaign.content || '<p>Empty campaign content</p>',
+                                                    Data: processedHtml,
                                                 },
                                                 Text: {
-                                                    Data: extractTextFromHtml(campaign.content) || 'Empty campaign content',
+                                                    Data: textContent || 'Empty campaign content',
                                                 },
                                             },
                                         },
                                         ReplyToAddresses: [replyTo || fromEmail],
+                                        // Configure feedback notifications
+                                        ConfigurationSetName: process.env.SES_CONFIGURATION_SET || undefined,
                                     })
                                     .promise();
+
+                                // Add delivery event to be tracked
+                                deliveryEvents.push({
+                                    contactId: contact._id,
+                                    campaignId: campaignId,
+                                    email: contact.email,
+                                    eventType: 'delivery',
+                                    metadata: {
+                                        messageId: result.MessageId,
+                                    },
+                                });
 
                                 successCount++;
                             } catch (error) {
                                 console.error(`Failed to send to ${contact.email}:`, error.message);
                                 failureCount++;
+                            }
+                        }
+
+                        // Log delivery events in bulk to campaign-specific collection
+                        if (deliveryEvents.length > 0) {
+                            try {
+                                const TrackingModel = createTrackingModel(campaignId);
+                                await TrackingModel.insertMany(deliveryEvents);
+                            } catch (error) {
+                                console.error('Error saving delivery events:', error);
                             }
                         }
 
@@ -465,7 +699,7 @@ emailCampaignQueue.process('send-campaign', async (job) => {
         console.error(`Error processing campaign ${campaignId}:`, error);
 
         // Update campaign status to failed
-        if (campaignId) {
+        if (campaignId && Campaign) {
             try {
                 const campaign = await Campaign.findById(campaignId);
                 if (campaign) {
@@ -481,36 +715,6 @@ emailCampaignQueue.process('send-campaign', async (job) => {
 
         throw error;
     }
-});
-
-// Extract plain text from HTML for text alternatives
-function extractTextFromHtml(html) {
-    if (!html) return '';
-
-    // Simple implementation - in production you might want a better HTML-to-text converter
-    return html
-        .replace(/<style[^>]*>.*?<\/style>/gs, '')
-        .replace(/<script[^>]*>.*?<\/script>/gs, '')
-        .replace(/<[^>]*>/gs, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-// Handle queue events
-emailCampaignQueue.on('completed', (job, result) => {
-    console.log(`Job ${job.id} completed with result:`, result);
-});
-
-emailCampaignQueue.on('failed', (job, error) => {
-    console.error(`Job ${job.id} failed with error:`, error);
-});
-
-schedulerQueue.on('completed', (job, result) => {
-    console.log(`Scheduler job ${job.id} completed with result:`, result);
-});
-
-schedulerQueue.on('failed', (job, error) => {
-    console.error(`Scheduler job ${job.id} failed with error:`, error);
 });
 
 // Add a cleanup routine that runs periodically
@@ -533,13 +737,30 @@ async function cleanupOldJobs() {
     }
 }
 
-// Add this at the bottom of the file
-setInterval(cleanupOldJobs, 24 * 60 * 60 * 1000); // Run once a day
+// Handle queue events
+emailCampaignQueue.on('completed', (job, result) => {
+    console.log(`Job ${job.id} completed with result:`, result);
+});
 
-// Start worker
+emailCampaignQueue.on('failed', (job, error) => {
+    console.error(`Job ${job.id} failed with error:`, error);
+});
+
+schedulerQueue.on('completed', (job, result) => {
+    console.log(`Scheduler job ${job.id} completed with result:`, result);
+});
+
+schedulerQueue.on('failed', (job, error) => {
+    console.error(`Scheduler job ${job.id} failed with error:`, error);
+});
+
+// Run cleanup once a day
+setInterval(cleanupOldJobs, 24 * 60 * 60 * 1000);
+
+// Connect to DB and start worker
 connectDB()
     .then(() => {
-        console.log('Email campaign worker started and ready to process jobs');
+        console.log('Email campaign worker with tracking started and ready to process jobs');
     })
     .catch((error) => {
         console.error('Failed to start worker:', error);
