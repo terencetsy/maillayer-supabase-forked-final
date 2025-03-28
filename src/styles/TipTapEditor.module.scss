@@ -1,4 +1,5 @@
 /* TipTap Editor Styles */
+@use 'sass:color';
 
 // Variables
 $editor-bg: #111111;
@@ -216,7 +217,7 @@ $active-color: #3b82f6;
                     color: white;
 
                     &:hover {
-                        background-color: darken($active-color, 10%);
+                        background-color: color.adjust($active-color, $lightness: -10%);
                     }
                 }
             }

@@ -1,4 +1,6 @@
 // Brand Verification Page Styles
+@use 'sass:color';
+
 .verification-container {
     display: flex;
     flex-direction: column;
@@ -286,7 +288,7 @@
             border: none;
 
             &:hover:not(:disabled) {
-                background-color: darken($accent-color, 5%);
+                background-color: color.adjust($accent-color, $lightness: -5%);
             }
         }
 
@@ -331,13 +333,13 @@
     &.error {
         background-color: rgba($danger-color, 0.1);
         border-left: 3px solid $danger-color;
-        color: lighten($danger-color, 10%);
+        color: color.adjust($danger-color, $lightness: 10%);
     }
 
     &.success {
         background-color: rgba(#10b981, 0.1);
         border-left: 3px solid #10b981;
-        color: lighten(#10b981, 10%);
+        color: color.adjust(#10b981, $lightness: 10%);
     }
 }
 

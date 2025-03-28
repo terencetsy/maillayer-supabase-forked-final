@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 $font-family-base: 'Onest', sans-serif;
 $font-weight-normal: 400;
 
@@ -45,17 +47,18 @@ $header-height: 64px;
 $sidebar-width: 240px;
 $content-max-width: 1200px;
 
-@import 'pages/dashboard';
-@import 'pages/brand-detail';
-@import 'pages/brand-layout';
-@import 'pages/brand-page';
-@import 'pages/brand-form';
-@import 'pages/campaign';
-@import 'pages/campaign-editor';
-@import 'components/toast';
-@import 'pages/contacts';
-@import 'pages/verification';
-@import 'pages/campaign-stats';
+@use 'variables' as *;
+@use 'pages/dashboard' as *;
+@use 'pages/brand-detail' as *;
+@use 'pages/brand-layout' as *;
+@use 'pages/brand-page' as *;
+@use 'pages/brand-form' as *;
+@use 'pages/campaign' as *;
+@use 'pages/campaign-editor' as *;
+@use 'components/toast' as *;
+@use 'pages/contacts' as *;
+@use 'pages/verification' as *;
+@use 'pages/campaign-stats' as *;
 
 * {
     box-sizing: border-box;
@@ -246,7 +249,7 @@ h4 {
     color: white;
 
     &:hover:not(:disabled) {
-        background-color: darken($primary-color, 5%);
+        background-color: color.adjust($primary-color, $lightness: -5%);
         transform: translateY(-2px);
         box-shadow: $shadow-md;
     }

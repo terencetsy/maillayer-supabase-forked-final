@@ -13,14 +13,19 @@ export const config = {
     },
 };
 
-// Initialize S3 client for DigitalOcean Spaces
+// Detect storage provider from environment variables
+const STORAGE_PROVIDER = process.env.STORAGE_PROVIDER?.toLowerCase() || 'digitalocean';
+
+// Initialize S3 client based on the storage provider
 const s3Client = new S3Client({
-    endpoint: process.env.DO_SPACES_ENDPOINT,
-    region: 'us-east-1', // DO Spaces use this region for API
+    endpoint: process.env.STORAGE_ENDPOINT,
+    region: STORAGE_PROVIDER === 'cloudflare' ? 'auto' : 'us-east-1',
     credentials: {
-        accessKeyId: process.env.DO_SPACES_KEY,
-        secretAccessKey: process.env.DO_SPACES_SECRET,
+        accessKeyId: process.env.STORAGE_ACCESS_KEY,
+        secretAccessKey: process.env.STORAGE_SECRET_KEY,
     },
+    // Add forcePathStyle for Cloudflare R2 compatibility
+    ...(STORAGE_PROVIDER === 'cloudflare' && { forcePathStyle: true }),
 });
 
 export default async function handler(req, res) {
@@ -62,20 +67,32 @@ export default async function handler(req, res) {
         // Read the file
         const fileData = fs.readFileSync(file.filepath);
 
-        // Upload to DigitalOcean Spaces
+        // Prepare upload parameters
         const uploadParams = {
-            Bucket: process.env.DO_SPACES_BUCKET,
+            Bucket: process.env.STORAGE_BUCKET,
             Key: `campaign-images/${fileName}`,
             Body: fileData,
-            ACL: 'public-read',
             ContentType: file.mimetype,
+            // Include ACL for both providers
+            ACL: 'public-read',
         };
 
         const command = new PutObjectCommand(uploadParams);
         await s3Client.send(command);
 
-        // Generate the URL
-        const fileUrl = `${process.env.DO_SPACES_URL}/campaign-images/${fileName}`;
+        // Generate the URL based on provider
+        let fileUrl;
+
+        if (STORAGE_PROVIDER === 'cloudflare') {
+            // For Cloudflare R2 - require public URL for public access
+            if (!process.env.STORAGE_PUBLIC_URL) {
+                throw new Error('STORAGE_PUBLIC_URL is required for Cloudflare R2 public access');
+            }
+            fileUrl = `${process.env.STORAGE_PUBLIC_URL}/campaign-images/${fileName}`;
+        } else {
+            // For DigitalOcean Spaces
+            fileUrl = `${process.env.STORAGE_PUBLIC_URL}/campaign-images/${fileName}`;
+        }
 
         // Return success response
         return res.status(200).json({

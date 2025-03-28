@@ -1,4 +1,5 @@
 /* Enhanced Brand Dashboard Styles - with consistent color theme */
+@use 'sass:color';
 
 // Using the same dark theme variables as brand details page
 $background-primary: #000000;
@@ -317,7 +318,7 @@ $transition-normal: all 0.2s ease;
         transition: $transition-normal;
 
         &:hover {
-            background-color: darken($accent-color, 5%);
+            background-color: color.adjust($accent-color, $lightness: -5%);
             transform: translateY(-2px);
         }
 
@@ -387,7 +388,7 @@ $transition-normal: all 0.2s ease;
         transition: $transition-normal;
 
         &:hover {
-            background-color: darken($accent-color, 5%);
+            background-color: color.adjust($accent-color, $lightness: -5%);
         }
 
         &.btn-secondary {
@@ -395,7 +396,7 @@ $transition-normal: all 0.2s ease;
             color: $text-secondary;
 
             &:hover {
-                background-color: lighten($accent-secondary, 5%);
+                background-color: color.adjust($accent-secondary, $lightness: 5%);
             }
         }
     }
