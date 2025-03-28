@@ -1,7 +1,11 @@
+// src/lib/config.js - Updated to match the CommonJS version
 // Centralized configuration settings for the application
 
 // Use BASE_URL as the single source of truth for URL-based settings
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+// Use ONLY the Redis URL, not individual components
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const config = {
     // Application URLs
@@ -12,13 +16,9 @@ const config = {
 
     // MongoDB connection
     mongodbUri: process.env.MONGODB_URI,
-    redisURL: process.env.REDIS_URL,
-    // Redis settings
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD,
-    },
+
+    // Redis configuration - use ONLY the URL
+    redisURL: REDIS_URL,
 
     // Security
     trackingSecret: process.env.TRACKING_SECRET,

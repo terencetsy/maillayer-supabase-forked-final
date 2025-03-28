@@ -2,17 +2,44 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Bull = require('bull');
+const Redis = require('ioredis');
 
-// Setup Redis connection for Bull
-const redisOptions = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD || undefined,
+// Get Redis URL - ONLY use the Redis URL, no fallback to individual components
+function getRedisUrl() {
+    return process.env.REDIS_URL || 'redis://localhost:6379';
+}
+
+// Use the Redis URL directly
+const redisUrl = getRedisUrl();
+console.log('Campaign manager using Redis URL:', redisUrl);
+
+// Create Redis clients for Bull with proper error handling
+const createRedisClient = () => {
+    const redisClient = new Redis(redisUrl);
+
+    redisClient.on('error', (err) => {
+        console.error('Campaign manager Redis client error:', err);
+    });
+
+    redisClient.on('connect', () => {
+        console.log('Campaign manager Redis client connected');
+    });
+
+    return redisClient;
 };
 
-// Connect to Bull queues
+// Connect to Bull queues using the client creation function
 const emailCampaignQueue = new Bull('email-campaigns', {
-    redis: redisOptions,
+    createClient: (type) => createRedisClient(),
+    defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 5000,
+        },
+        removeOnComplete: 100,
+        removeOnFail: 100,
+    },
 });
 
 // Connect to MongoDB

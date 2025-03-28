@@ -12,7 +12,11 @@ const Redis = require('ioredis');
 
 // Create Redis clients with proper error handling
 const createRedisClient = () => {
-    const redisClient = new Redis(config.redisURL);
+    // Use the Redis URL from the config
+    const redisUrl = config.redisURL;
+    console.log('Email processor using Redis URL:', redisUrl);
+
+    const redisClient = new Redis(redisUrl);
 
     redisClient.on('error', (err) => {
         console.error('Email processor Redis error:', err);

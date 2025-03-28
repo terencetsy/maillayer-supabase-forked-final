@@ -8,7 +8,8 @@ const isESM = typeof require === 'undefined' || !require.resolve;
 
 // Get Redis URL - ONLY use the Redis URL, no fallback to individual components
 function getRedisUrl() {
-    return process.env.REDIS_URL;
+    // Simply return the environment variable, with a default value if not set
+    return process.env.REDIS_URL || 'redis://localhost:6379';
 }
 
 if (isESM) {
@@ -21,6 +22,7 @@ if (isESM) {
 
             // Only use Redis URL
             const redisUrl = getRedisUrl();
+            console.log('Next.js using Redis URL:', redisUrl);
 
             // Create Redis clients for Bull with proper error handling
             const createRedisClient = () => {

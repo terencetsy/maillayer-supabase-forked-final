@@ -1,8 +1,12 @@
-// CommonJS version of config for worker scripts
-require('dotenv').config();
+// src/lib/configCommonJS.js
+// This file provides a CommonJS-compatible version of the config for worker scripts
 
 // Use BASE_URL as the single source of truth for URL-based settings
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+// The most important change: ONLY use the Redis URL, don't use individual components
+// This prevents configuration mismatch between different parts of the app
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const config = {
     // Application URLs
@@ -14,12 +18,8 @@ const config = {
     // MongoDB connection
     mongodbUri: process.env.MONGODB_URI,
 
-    // Redis settings
-    redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD,
-    },
+    // Redis configuration - use ONLY the URL
+    redisURL: REDIS_URL,
 
     // Security
     trackingSecret: process.env.TRACKING_SECRET,

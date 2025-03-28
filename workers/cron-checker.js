@@ -3,17 +3,35 @@ require('dotenv').config();
 const Bull = require('bull');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
+const Redis = require('ioredis');
 
-// Setup Redis connection for Bull
-const redisOptions = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD || undefined,
+// Get Redis URL - ONLY use the Redis URL, no fallback to individual components
+function getRedisUrl() {
+    return process.env.REDIS_URL || 'redis://localhost:6379';
+}
+
+// Use the Redis URL directly
+const redisUrl = getRedisUrl();
+console.log('Cron checker using Redis URL:', redisUrl);
+
+// Create Redis clients for Bull with proper error handling
+const createRedisClient = () => {
+    const redisClient = new Redis(redisUrl);
+
+    redisClient.on('error', (err) => {
+        console.error('Cron checker Redis client error:', err);
+    });
+
+    redisClient.on('connect', () => {
+        console.log('Cron checker Redis client connected');
+    });
+
+    return redisClient;
 };
 
-// Create scheduler queue
+// Create scheduler queue using the client creation function
 const schedulerQueue = new Bull('campaign-scheduler', {
-    redis: redisOptions,
+    createClient: (type) => createRedisClient(),
     defaultJobOptions: {
         removeOnComplete: true,
     },
