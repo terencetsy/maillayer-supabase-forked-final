@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
             // Extract campaign ID and contact ID from message tags
             let campaignId, contactId;
-            console.log(mailData.tags);
+            console.log(JSON.stringify(mailData));
             if (mailData.tags) {
                 if (mailData.tags.campaignId) {
                     campaignId = mailData.tags.campaignId[0];
