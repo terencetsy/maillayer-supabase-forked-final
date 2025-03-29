@@ -202,6 +202,10 @@ export default async function handler(req, res) {
                     return res.status(403).json({ message: 'Campaign does not belong to this brand' });
                 }
 
+                if (campaign.status !== 'draft') {
+                    return res.status(400).json({ message: 'Only draft campaigns can be deleted' });
+                }
+
                 const success = await deleteCampaign(id, userId);
 
                 if (success) {

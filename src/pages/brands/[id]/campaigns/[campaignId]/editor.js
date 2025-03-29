@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Send, Info } from 'lucide-react';
 
 export default function CampaignEditor() {
     const { data: session, status } = useSession();
@@ -91,6 +91,7 @@ export default function CampaignEditor() {
         try {
             setIsSaving(true);
             setSaveMessage('');
+            setError('');
 
             const res = await fetch(`/api/brands/${id}/campaigns/${campaignId}`, {
                 method: 'PUT',
@@ -121,6 +122,11 @@ export default function CampaignEditor() {
         }
     };
 
+    const handleSend = () => {
+        // Navigate to the send page
+        router.push(`/brands/${id}/campaigns/${campaignId}/send`);
+    };
+
     if (isLoading || !brand || !campaign) {
         return (
             <BrandLayout brand={brand}>
@@ -134,26 +140,24 @@ export default function CampaignEditor() {
 
     return (
         <BrandLayout brand={brand}>
-            <div className="campaign-editor-container">
-                <div className="editor-header">
-                    <div className="editor-header-left">
+            <div className="campaign-editor-page">
+                <div className="editor-top-bar">
+                    <div className="editor-nav">
                         <Link
-                            href={`/brands/${id}/campaigns/${campaignId}`}
+                            href={`/brands/${id}/campaigns`}
                             className="back-link"
                         >
                             <ArrowLeft size={16} />
-                            <span>Back to campaign</span>
+                            <span>All the campaigns</span>
                         </Link>
-                        <h1>{campaign.name}</h1>
-                        <div className="campaign-subject">
-                            <span>Subject:</span> {campaign.subject}
-                        </div>
                     </div>
-                    <div className="editor-header-right">
-                        {saveMessage && <div className="save-message">{saveMessage}</div>}
-                        {error && <div className="save-error">{error}</div>}
+
+                    <div className="editor-actions">
+                        {saveMessage && <div className="status-message success">{saveMessage}</div>}
+                        {error && <div className="status-message error">{error}</div>}
+
                         <button
-                            className="save-button"
+                            className="btn-save"
                             onClick={handleSave}
                             disabled={isSaving}
                         >
@@ -169,10 +173,32 @@ export default function CampaignEditor() {
                                 </>
                             )}
                         </button>
+
+                        {campaign.status === 'draft' && (
+                            <button
+                                className="btn-send"
+                                onClick={handleSend}
+                            >
+                                <Send size={16} />
+                                <span>Send</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                <div className="editor-main">
+                <div className="campaign-header">
+                    <h1>{campaign.name}</h1>
+                    <div className="subject-line">
+                        <span>Subject:</span> {campaign.subject}
+                    </div>
+                </div>
+
+                <div className="editor-container">
+                    <div className="editor-info-bar">
+                        <Info size={14} />
+                        <span>Email preview - Your subscribers will see content as displayed below</span>
+                    </div>
+
                     <RichTextEditor
                         value={content}
                         onChange={handleContentChange}

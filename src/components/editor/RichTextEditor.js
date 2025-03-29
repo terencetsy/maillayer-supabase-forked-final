@@ -215,7 +215,7 @@ export default function RichTextEditor({ value = '', onChange, placeholder = 'St
 // Default email template with a standard email font
 function getDefaultEmailTemplate() {
     return `
-    <div style="font-family: Arial, sans-serif; color: #333333; max-width: 600px; margin: 0 auto;">
+    <div style="font-family: Arial, sans-serif; color: #ffffff; max-width: 600px; margin: 0 auto;">
         <h2>Email Title</h2>
         <p>Hello,</p>
         <p>Edit this template to create your email content.</p>

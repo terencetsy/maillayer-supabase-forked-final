@@ -228,247 +228,243 @@ export default function SendCampaign() {
     }
     return (
         <BrandLayout brand={brand}>
-            <div className="send-campaign-container">
-                {/* Back button */}
-                <Link
-                    href={`/brands/${id}/campaigns/${campaignId}`}
-                    className="back-link"
-                >
-                    <ArrowLeft size={16} />
-                    <span>Back to campaign</span>
-                </Link>
-
-                <div className="send-campaign-header">
+            <div className="sc-container">
+                <div className="sc-header">
+                    <Link
+                        href={`/brands/${id}/campaigns/${campaignId}`}
+                        className="sc-back-link"
+                    >
+                        <ArrowLeft size={16} />
+                        <span>Back to campaign</span>
+                    </Link>
                     <h1>Send Campaign</h1>
                 </div>
 
                 {error && (
-                    <div className="send-alert error">
+                    <div className="sc-alert sc-alert-error">
+                        <AlertCircle size={20} />
                         <span>{error}</span>
                     </div>
                 )}
 
                 {success && (
-                    <div className="send-alert success">
-                        <CheckCircle size={18} />
+                    <div className="sc-alert sc-alert-success">
+                        <CheckCircle size={20} />
                         <span>{success}</span>
                     </div>
                 )}
 
-                <div className="send-campaign-layout">
-                    {/* Left Column - Settings */}
-                    <div className="send-settings">
-                        <div className="campaign-preview-card">
-                            <div className="preview-header">
-                                <Mail size={20} />
-                                <h3>Campaign Details</h3>
-                            </div>
-                            <div className="preview-content">
-                                <div className="preview-item">
-                                    <span className="label">Name:</span>
-                                    <span className="value">{campaign.name}</span>
-                                </div>
-                                <div className="preview-item">
-                                    <span className="label">Subject:</span>
-                                    <span className="value">{campaign.subject}</span>
-                                </div>
-                                <div className="preview-item">
-                                    <span className="label">From:</span>
-                                    <span className="value">
-                                        {campaign.fromName || brand.name} &lt;{campaign.fromEmail || brand.fromEmail || 'Not set'}&gt;
-                                    </span>
-                                </div>
+                <div className="sc-card">
+                    <div className="sc-card-header">
+                        <Mail size={18} />
+                        <h2>Campaign Details</h2>
+                    </div>
+                    <div className="sc-card-content">
+                        <div className="sc-detail-row">
+                            <div className="sc-detail-label">Name:</div>
+                            <div className="sc-detail-value">{campaign.name}</div>
+                        </div>
+                        <div className="sc-detail-row">
+                            <div className="sc-detail-label">Subject:</div>
+                            <div className="sc-detail-value">{campaign.subject}</div>
+                        </div>
+                        <div className="sc-detail-row">
+                            <div className="sc-detail-label">From:</div>
+                            <div className="sc-detail-value">
+                                {campaign.fromName || brand.name} &lt;{campaign.fromEmail || brand.fromEmail || 'Not set'}&gt;
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="send-section">
-                            <div className="section-header">
-                                <Users size={18} />
-                                <h3>Select Recipients</h3>
+                <div className="sc-card">
+                    <div className="sc-card-header">
+                        <Mail size={18} />
+                        <h2>Email Preview</h2>
+                    </div>
+                    <div className="sc-card-content">
+                        <div
+                            className="sc-email-preview"
+                            dangerouslySetInnerHTML={{ __html: campaign.content || '<p>No content yet. Go back and edit your campaign to add content.</p>' }}
+                        ></div>
+                    </div>
+                </div>
+
+                <div className="sc-card">
+                    <div className="sc-card-header">
+                        <Users size={18} />
+                        <h2>Select Recipients</h2>
+                    </div>
+                    <div className="sc-card-content">
+                        {isLoadingLists ? (
+                            <div className="sc-loading">
+                                <div className="sc-spinner"></div>
+                                <p>Loading contact lists...</p>
                             </div>
-
-                            {isLoadingLists ? (
-                                <div className="loading-inline">
-                                    <div className="spinner-small"></div>
-                                    <p>Loading contact lists...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {contactLists.length === 0 ? (
-                                        <div className="no-lists-message">
-                                            <p>You don't have any contact lists with contacts. Please create a contact list and add contacts first.</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="contact-lists-selection">
-                                                {contactLists.map((list) => (
-                                                    <div
-                                                        key={list._id}
-                                                        className={`list-selection-item ${selectedLists.includes(list._id) ? 'selected' : ''}`}
-                                                        onClick={() => handleToggleList(list._id)}
-                                                    >
-                                                        <div className="checkbox">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedLists.includes(list._id)}
-                                                                onChange={() => {}}
-                                                                id={`list-${list._id}`}
-                                                            />
-                                                        </div>
-                                                        <div className="list-info">
-                                                            <h4>{list.name}</h4>
-                                                            <p>{list.contactCount} contacts</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            {selectedLists.length > 0 && (
-                                                <div className="selected-summary">
-                                                    <Users size={16} />
-                                                    <span>
-                                                        Sending to {totalContacts} contacts across {selectedLists.length} list{selectedLists.length !== 1 ? 's' : ''}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </div>
-
-                        <div className="send-section">
-                            <div className="section-header">
-                                <Calendar size={18} />
-                                <h3>Choose When to Send</h3>
-                            </div>
-
-                            <div className="schedule-options">
-                                <div
-                                    className={`schedule-option ${scheduleType === 'send_now' ? 'selected' : ''}`}
-                                    onClick={() => setScheduleType('send_now')}
-                                >
-                                    <div className="option-radio">
-                                        <input
-                                            type="radio"
-                                            checked={scheduleType === 'send_now'}
-                                            onChange={() => {}}
-                                            id="send-now"
-                                        />
+                        ) : (
+                            <>
+                                {contactLists.length === 0 ? (
+                                    <div className="sc-empty">
+                                        <p>You don't have any contact lists with contacts. Please create a contact list and add contacts first.</p>
+                                        <Link
+                                            href={`/brands/${id}/contacts`}
+                                            className="sc-btn sc-btn-primary"
+                                        >
+                                            Create Contact List
+                                        </Link>
                                     </div>
-                                    <div className="option-content">
-                                        <Send size={18} />
-                                        <div className="option-info">
-                                            <h4>Send Now</h4>
-                                            <p>Your campaign will be sent immediately</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div
-                                    className={`schedule-option ${scheduleType === 'schedule' ? 'selected' : ''}`}
-                                    onClick={() => setScheduleType('schedule')}
-                                >
-                                    <div className="option-radio">
-                                        <input
-                                            type="radio"
-                                            checked={scheduleType === 'schedule'}
-                                            onChange={() => {}}
-                                            id="schedule"
-                                        />
-                                    </div>
-                                    <div className="option-content">
-                                        <Calendar size={18} />
-                                        <div className="option-info">
-                                            <h4>Schedule for Later</h4>
-                                            <p>Select a date and time to send this campaign</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {scheduleType === 'schedule' && (
-                                <div className="date-time-selection">
-                                    <div className="date-picker-wrapper">
-                                        <label>Date</label>
-                                        <DatePicker
-                                            selected={scheduledDate}
-                                            onChange={(date) => setScheduledDate(date)}
-                                            minDate={new Date()}
-                                            className="date-picker"
-                                        />
-                                    </div>
-
-                                    <div className="time-picker-wrapper">
-                                        <label>Time</label>
-                                        <DatePicker
-                                            selected={scheduledTime}
-                                            onChange={(time) => setScheduledTime(time)}
-                                            showTimeSelect
-                                            showTimeSelectOnly
-                                            timeIntervals={15}
-                                            timeCaption="Time"
-                                            dateFormat="h:mm aa"
-                                            className="time-picker"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="send-action">
-                            {!isBrandReadyToSend() && (
-                                <div className="verification-required-alert">
-                                    <AlertCircle size={16} />
-                                    <span>{brand.status === 'pending_setup' ? 'You need to complete brand setup before sending campaigns.' : 'Your brand is pending verification. Please verify your domain and email sending settings first.'}</span>
-                                </div>
-                            )}
-                            <button
-                                className="send-button"
-                                onClick={handleSendCampaign}
-                                disabled={isSending || selectedLists.length === 0 || !isBrandReadyToSend()}
-                            >
-                                {isSending ? (
-                                    <>
-                                        <div className="spinner-button"></div>
-                                        <span>Processing...</span>
-                                    </>
                                 ) : (
                                     <>
-                                        <Send size={18} />
-                                        <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : 'Schedule Campaign'}</span>
+                                        <div className="sc-lists">
+                                            {contactLists.map((list) => (
+                                                <div
+                                                    key={list._id}
+                                                    className={`sc-list-item ${selectedLists.includes(list._id) ? 'sc-selected' : ''}`}
+                                                    onClick={() => handleToggleList(list._id)}
+                                                >
+                                                    <div className="sc-checkbox">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedLists.includes(list._id)}
+                                                            onChange={() => {}}
+                                                            id={`list-${list._id}`}
+                                                        />
+                                                    </div>
+                                                    <div className="sc-list-info">
+                                                        <h4>{list.name}</h4>
+                                                        <p>{list.contactCount} contacts</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {selectedLists.length > 0 && (
+                                            <div className="sc-summary">
+                                                <Users size={16} />
+                                                <span>
+                                                    Sending to <strong>{totalContacts}</strong> contacts across {selectedLists.length} list{selectedLists.length !== 1 ? 's' : ''}
+                                                </span>
+                                            </div>
+                                        )}
                                     </>
                                 )}
-                            </button>
-                            {!isBrandReadyToSend() && (
-                                <Link
-                                    href={`/brands/${id}/verification`}
-                                    className="verification-link"
-                                >
-                                    Go to verification page
-                                </Link>
-                            )}
-                        </div>
+                            </>
+                        )}
                     </div>
+                </div>
 
-                    {/* Right Column - Email Preview */}
-                    <div className="email-preview-container">
-                        <div className="preview-header">
-                            <h3>Email Preview</h3>
-                        </div>
-                        <div className="preview-subheader">
-                            <div className="preview-subject">
-                                <span className="label">Subject:</span>
-                                <span className="value">{campaign.subject}</span>
+                <div className="sc-card">
+                    <div className="sc-card-header">
+                        <Calendar size={18} />
+                        <h2>Choose When to Send</h2>
+                    </div>
+                    <div className="sc-card-content">
+                        <div className="sc-schedule-options">
+                            <div
+                                className={`sc-option ${scheduleType === 'send_now' ? 'sc-selected' : ''}`}
+                                onClick={() => setScheduleType('send_now')}
+                            >
+                                <div className="sc-radio">
+                                    <input
+                                        type="radio"
+                                        checked={scheduleType === 'send_now'}
+                                        onChange={() => {}}
+                                        id="send-now"
+                                    />
+                                </div>
+                                <div className="sc-option-content">
+                                    <Send size={18} />
+                                    <div className="sc-option-info">
+                                        <h4>Send Now</h4>
+                                        <p>Your campaign will be sent immediately</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                className={`sc-option ${scheduleType === 'schedule' ? 'sc-selected' : ''}`}
+                                onClick={() => setScheduleType('schedule')}
+                            >
+                                <div className="sc-radio">
+                                    <input
+                                        type="radio"
+                                        checked={scheduleType === 'schedule'}
+                                        onChange={() => {}}
+                                        id="schedule"
+                                    />
+                                </div>
+                                <div className="sc-option-content">
+                                    <Calendar size={18} />
+                                    <div className="sc-option-info">
+                                        <h4>Schedule for Later</h4>
+                                        <p>Select a date and time to send this campaign</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div className="email-content-preview">
-                            <div
-                                className="email-body-preview"
-                                dangerouslySetInnerHTML={{ __html: campaign.content || '<p>No content yet. Go back and edit your campaign to add content.</p>' }}
-                            ></div>
-                        </div>
+
+                        {scheduleType === 'schedule' && (
+                            <div className="sc-datetime">
+                                <div className="sc-date-wrapper">
+                                    <label>Date</label>
+                                    <DatePicker
+                                        selected={scheduledDate}
+                                        onChange={(date) => setScheduledDate(date)}
+                                        minDate={new Date()}
+                                        className="sc-date-input"
+                                    />
+                                </div>
+
+                                <div className="sc-time-wrapper">
+                                    <label>Time</label>
+                                    <DatePicker
+                                        selected={scheduledTime}
+                                        onChange={(time) => setScheduledTime(time)}
+                                        showTimeSelect
+                                        showTimeSelectOnly
+                                        timeIntervals={15}
+                                        timeCaption="Time"
+                                        dateFormat="h:mm aa"
+                                        className="sc-time-input"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
+                </div>
+
+                {!isBrandReadyToSend() && (
+                    <div className="sc-verification-alert">
+                        <AlertCircle size={16} />
+                        <span>{brand.status === 'pending_setup' ? 'You need to complete brand setup before sending campaigns.' : 'Your brand is pending verification. Please verify your domain and email sending settings first.'}</span>
+                    </div>
+                )}
+
+                <div className="sc-actions">
+                    <Link
+                        href={`/brands/${id}/campaigns/${campaignId}`}
+                        className="sc-btn sc-btn-cancel"
+                    >
+                        Cancel
+                    </Link>
+
+                    <button
+                        className="sc-btn sc-btn-send"
+                        onClick={handleSendCampaign}
+                        disabled={isSending || selectedLists.length === 0 || !isBrandReadyToSend()}
+                    >
+                        {isSending ? (
+                            <>
+                                <div className="sc-spinner-btn"></div>
+                                <span>Processing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Send size={18} />
+                                <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : 'Schedule Campaign'}</span>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </BrandLayout>

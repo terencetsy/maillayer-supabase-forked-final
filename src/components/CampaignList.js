@@ -1,36 +1,52 @@
-import { useState } from 'react';
+// components/CampaignList.js
+import React from 'react';
 import Link from 'next/link';
-import { Clock } from 'lucide-react';
+import { Copy, Edit, Trash, BarChart2, Mail } from 'lucide-react';
 
-export default function CampaignList({ campaigns, brandId }) {
-    // Format date
-    const formatDate = (dateString) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date
-            .toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-            })
-            .replace(/\//g, '/');
+const CampaignList = ({ campaigns, brandId }) => {
+    // Function to handle campaign duplication
+    const handleDuplicate = async (campaignId, campaignName) => {
+        // Implementation for duplicating campaign
+        // You'll need to create an API endpoint for this
+        try {
+            const response = await fetch(`/api/brands/${brandId}/campaigns/${campaignId}/duplicate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: `${campaignName} (Copy)` }),
+            });
+
+            if (response.ok) {
+                // Refresh the page or update the list
+                window.location.reload();
+            } else {
+                alert('Failed to duplicate campaign');
+            }
+        } catch (error) {
+            console.error('Error duplicating campaign:', error);
+            alert('An error occurred while duplicating the campaign');
+        }
     };
 
-    // Get status badge
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case 'draft':
-                return (
-                    <span className="status-badge draft">
-                        <Clock size={14} /> Draft
-                    </span>
-                );
-            case 'scheduled':
-                return <span className="status-badge scheduled">Scheduled</span>;
-            case 'sent':
-                return <span className="status-badge sent">Sent</span>;
-            default:
-                return <span className="status-badge">{status}</span>;
+    // Function to handle campaign deletion
+    const handleDelete = async (campaignId) => {
+        if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+            try {
+                const response = await fetch(`/api/brands/${brandId}/campaigns/${campaignId}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    // Refresh the page or update the list
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete campaign');
+                }
+            } catch (error) {
+                console.error('Error deleting campaign:', error);
+                alert('An error occurred while deleting the campaign');
+            }
         }
     };
 
@@ -39,15 +55,12 @@ export default function CampaignList({ campaigns, brandId }) {
             <table className="campaigns-table">
                 <thead>
                     <tr>
-                        <th className="campaign-col">CAMPAIGN</th>
-                        <th className="status-col">STATUS</th>
-                        <th className="recipients-col">RECIPIENTS</th>
-                        <th className="openrate-col">OPEN RATE</th>
-                        <th className="created-col">
-                            CREATED
-                            <button className="sort-btn">↓</button>
-                        </th>
-                        <th className="actions-col">ACTIONS</th>
+                        <th className="campaign-col">Campaign</th>
+                        <th className="status-col">Status</th>
+                        <th className="recipients-col">Recipients</th>
+                        <th className="openrate-col">Open Rate</th>
+                        <th className="created-col">Created</th>
+                        <th className="actions-col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,26 +69,7 @@ export default function CampaignList({ campaigns, brandId }) {
                             <td className="campaign-col">
                                 <div className="campaign-info">
                                     <div className="email-icon">
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <rect
-                                                width="20"
-                                                height="16"
-                                                x="2"
-                                                y="4"
-                                                rx="2"
-                                            />
-                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                        </svg>
+                                        <Mail size={16} />
                                     </div>
                                     <div className="campaign-details">
                                         <div className="campaign-name">{campaign.name}</div>
@@ -83,25 +77,57 @@ export default function CampaignList({ campaigns, brandId }) {
                                     </div>
                                 </div>
                             </td>
-                            <td className="status-col">{getStatusBadge(campaign.status)}</td>
-                            <td className="recipients-col">{campaign.stats?.recipients || 0}</td>
-                            <td className="openrate-col">{campaign.status === 'sent' ? `${campaign.openRate}%` : '-'}</td>
-                            <td className="created-col">{formatDate(campaign.createdAt)}</td>
+                            <td className="status-col">
+                                <span className={`status-badge ${campaign.status}`}>{campaign.status === 'draft' ? 'Draft' : campaign.status === 'sending' ? 'Sending' : campaign.status === 'sent' ? 'Sent' : campaign.status === 'scheduled' ? 'Scheduled' : campaign.status}</span>
+                            </td>
+                            <td className="recipients-col">{campaign.recipientCount || '-'}</td>
+                            <td className="openrate-col">{campaign.status === 'sent' ? `${campaign.openRate || 0}%` : '-'}</td>
+                            <td className="created-col">{new Date(campaign.createdAt).toLocaleDateString()}</td>
                             <td className="actions-col">
                                 <div className="action-buttons">
-                                    <Link
-                                        href={`/brands/${brandId}/campaigns/${campaign._id}`}
-                                        className="view-btn"
-                                    >
-                                        View
-                                    </Link>
-                                    {campaign.status === 'draft' && (
-                                        <Link
-                                            href={`/brands/${brandId}/campaigns/${campaign._id}/edit`}
-                                            className="edit-btn"
-                                        >
-                                            Edit
-                                        </Link>
+                                    {campaign.status === 'draft' ? (
+                                        <>
+                                            {/* Actions for draft campaigns */}
+                                            <Link
+                                                href={`/brands/${brandId}/campaigns/${campaign._id}/editor`}
+                                                className="edit-btn"
+                                                title="Edit campaign"
+                                            >
+                                                <Edit size={16} />
+                                            </Link>
+                                            <button
+                                                className="duplicate-btn"
+                                                onClick={() => handleDuplicate(campaign._id, campaign.name)}
+                                                title="Duplicate campaign"
+                                            >
+                                                <Copy size={16} />
+                                            </button>
+                                            <button
+                                                className="delete-btn"
+                                                onClick={() => handleDelete(campaign._id)}
+                                                title="Delete campaign"
+                                            >
+                                                <Trash size={16} />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* Actions for non-draft campaigns */}
+                                            <Link
+                                                href={`/brands/${brandId}/campaigns/${campaign._id}`}
+                                                className="view-btn"
+                                                title="View report"
+                                            >
+                                                <BarChart2 size={16} />
+                                            </Link>
+                                            <button
+                                                className="duplicate-btn"
+                                                onClick={() => handleDuplicate(campaign._id, campaign.name)}
+                                                title="Duplicate campaign"
+                                            >
+                                                <Copy size={16} />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </td>
@@ -111,4 +137,6 @@ export default function CampaignList({ campaigns, brandId }) {
             </table>
         </div>
     );
-}
+};
+
+export default CampaignList;
