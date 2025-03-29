@@ -10,6 +10,7 @@ const Redis = require('ioredis');
 
 // Load our CommonJS compatible config
 const config = require('../src/lib/configCommonJS');
+const { generateUnsubscribeToken } = require('../src/lib/tokenUtils');
 
 // Define all the models we need directly in this file for worker use
 // This ensures they are available when we process jobs
@@ -347,7 +348,7 @@ function generateTrackingToken(campaignId, contactId, email) {
     return crypto.createHash('sha256').update(dataToHash).digest('hex');
 }
 
-function processHtml(html, campaignId, contactId, email, trackingDomain = '') {
+function processHtml(html, campaignId, contactId, email, trackingDomain = '', brandId) {
     // Fallback to using the API routes if tracking domain is not provided
     const domain = trackingDomain || process.env.TRACKING_DOMAIN || '';
 
@@ -372,6 +373,19 @@ function processHtml(html, campaignId, contactId, email, trackingDomain = '') {
     // Add tracking pixel at the end of the email
     const trackingPixel = `<img src="${domain}/api/tracking/open?${trackingParams}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
     $('body').append(trackingPixel);
+
+    // Generate unsubscribe token
+    const unsubscribeToken = generateUnsubscribeToken(contactId, brandId, campaignId);
+    const unsubscribeUrl = `${config.baseUrl}/unsubscribe/${unsubscribeToken}`;
+    // Create unsubscribe footer
+    const unsubscribeFooter = `
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center;">
+                  <p>If you no longer wish to receive emails from us, you can <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">unsubscribe here</a>.</p>
+              </div>
+          `;
+
+    // Add unsubscribe footer before the end of the body
+    $('body').append(unsubscribeFooter);
 
     // Return the modified HTML
     return $.html();
@@ -776,7 +790,6 @@ async function initializeQueues() {
                                 try {
                                     // Add tracking to HTML content
                                     const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
-
                                     // Extract plain text for text-only clients
                                     const textContent = extractTextFromHtml(processedHtml);
 

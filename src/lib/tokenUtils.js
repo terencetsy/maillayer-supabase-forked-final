@@ -1,10 +1,10 @@
-// lib/tokenUtils.js
-import jwt from 'jsonwebtoken';
+// lib/tokenUtils.js - CommonJS version
+const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'your-secret-key'; // Use a strong secret!
 
 // Generate unsubscribe token
-export function generateUnsubscribeToken(contactId, brandId, campaignId = null) {
+function generateUnsubscribeToken(contactId, brandId, campaignId = null) {
     const payload = {
         contactId,
         brandId,
@@ -17,7 +17,7 @@ export function generateUnsubscribeToken(contactId, brandId, campaignId = null) 
 }
 
 // Verify the token is valid
-export function verifyUnsubscribeToken(token) {
+function verifyUnsubscribeToken(token) {
     try {
         jwt.verify(token, SECRET_KEY);
         return true;
@@ -27,7 +27,7 @@ export function verifyUnsubscribeToken(token) {
 }
 
 // Decode the token to extract contactId and other info
-export function decodeUnsubscribeToken(token) {
+function decodeUnsubscribeToken(token) {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
         return {
@@ -39,3 +39,9 @@ export function decodeUnsubscribeToken(token) {
         return {};
     }
 }
+
+module.exports = {
+    generateUnsubscribeToken,
+    verifyUnsubscribeToken,
+    decodeUnsubscribeToken,
+};

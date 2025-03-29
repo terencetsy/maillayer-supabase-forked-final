@@ -4,8 +4,13 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
 import { ArrowLeft, Send, Calendar, Clock, CheckCircle, Users, Mail, AlertCircle } from 'lucide-react';
-import DatePicker from 'react-datepicker';
+import dynamic from 'next/dynamic';
 import 'react-datepicker/dist/react-datepicker.css';
+
+// Dynamically import DatePicker with SSR disabled
+const DatePicker = dynamic(() => import('react-datepicker'), {
+    ssr: false,
+});
 
 export default function SendCampaign() {
     const { data: session, status } = useSession();
@@ -404,18 +409,17 @@ export default function SendCampaign() {
                         </div>
 
                         {scheduleType === 'schedule' && (
-                            <div className="sc-datetime">
-                                <div className="sc-date-wrapper">
+                            <div className="date-time-selection">
+                                <div className="date-picker-wrapper">
                                     <label>Date</label>
                                     <DatePicker
                                         selected={scheduledDate}
                                         onChange={(date) => setScheduledDate(date)}
                                         minDate={new Date()}
-                                        className="sc-date-input"
+                                        className="date-picker"
                                     />
                                 </div>
-
-                                <div className="sc-time-wrapper">
+                                <div className="time-picker-wrapper">
                                     <label>Time</label>
                                     <DatePicker
                                         selected={scheduledTime}
@@ -425,7 +429,7 @@ export default function SendCampaign() {
                                         timeIntervals={15}
                                         timeCaption="Time"
                                         dateFormat="h:mm aa"
-                                        className="sc-time-input"
+                                        className="time-picker"
                                     />
                                 </div>
                             </div>
