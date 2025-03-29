@@ -35,6 +35,23 @@ const ContactSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
+        isUnsubscribed: {
+            type: Boolean,
+            default: false,
+        },
+        unsubscribedAt: {
+            type: Date,
+            default: null,
+        },
+        unsubscribedFromCampaign: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Campaign',
+            default: null,
+        },
+        unsubscribeReason: {
+            type: String,
+            default: null,
+        },
         createdAt: {
             type: Date,
             default: Date.now,

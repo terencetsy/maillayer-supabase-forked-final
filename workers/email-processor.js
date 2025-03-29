@@ -724,6 +724,7 @@ async function initializeQueues() {
                     // Get contacts from this list
                     const totalContacts = await Contact.countDocuments({
                         listId: listId,
+                        isUnsubscribed: { $ne: true },
                     });
 
                     console.log(`Processing list ${listId} with ${totalContacts} contacts`);
@@ -741,6 +742,7 @@ async function initializeQueues() {
                         // Load a chunk of contacts
                         const contacts = await Contact.find({
                             listId: listId,
+                            isUnsubscribed: { $ne: true },
                         })
                             .sort({ _id: 1 }) // Ensure consistent ordering
                             .skip(startIndex)
@@ -773,7 +775,7 @@ async function initializeQueues() {
 
                                 try {
                                     // Add tracking to HTML content
-                                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain);
+                                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
 
                                     // Extract plain text for text-only clients
                                     const textContent = extractTextFromHtml(processedHtml);

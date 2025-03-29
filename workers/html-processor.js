@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const crypto = require('crypto');
 const config = require('../src/lib/configCommonJS');
+const { generateUnsubscribeToken } = require('@/lib/tokenUtils');
 
 function generateTrackingToken(campaignId, contactId, email) {
     const dataToHash = `${campaignId}:${contactId}:${email}:${config.trackingSecret || 'tracking-secret-key'}`;
@@ -27,6 +28,20 @@ function processHtml(html, campaignId, contactId, email, trackingDomain = '') {
 
     const trackingPixel = `<img src="${domain}/api/tracking/open?${trackingParams}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
     $('body').append(trackingPixel);
+
+    // Generate unsubscribe token
+    const unsubscribeToken = generateUnsubscribeToken(contactId, brandId, campaignId);
+    const unsubscribeUrl = `${process.env.BASE_URL}/unsubscribe/${unsubscribeToken}`;
+
+    // Create unsubscribe footer
+    const unsubscribeFooter = `
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center;">
+              <p>If you no longer wish to receive emails from us, you can <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">unsubscribe here</a>.</p>
+          </div>
+      `;
+
+    // Add unsubscribe footer before the end of the body
+    $('body').append(unsubscribeFooter);
 
     return $.html();
 }
