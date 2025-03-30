@@ -108,9 +108,9 @@ export default async function handler(req, res) {
                 try {
                     let email = null;
 
-                    if (messageContent.notificationType === 'Bounce' && messageContent.bounce && messageContent.bounce.bouncedRecipients && messageContent.bounce.bouncedRecipients.length > 0) {
+                    if (messageContent.eventType === 'Bounce' && messageContent.bounce && messageContent.bounce.bouncedRecipients && messageContent.bounce.bouncedRecipients.length > 0) {
                         email = messageContent.bounce.bouncedRecipients[0].emailAddress;
-                    } else if (messageContent.notificationType === 'Complaint' && messageContent.complaint && messageContent.complaint.complainedRecipients && messageContent.complaint.complainedRecipients.length > 0) {
+                    } else if (messageContent.eventType === 'Complaint' && messageContent.complaint && messageContent.complaint.complainedRecipients && messageContent.complaint.complainedRecipients.length > 0) {
                         email = messageContent.complaint.complainedRecipients[0].emailAddress;
                     }
 
@@ -132,12 +132,11 @@ export default async function handler(req, res) {
                     messageId: mailData.messageId,
                     foundCampaignId: campaignId || 'missing',
                     foundContactId: contactId || 'missing',
-                    notificationType: messageContent.notificationType,
+                    notificationType: messageContent.eventType,
                 });
                 return res.status(200).json({ message: 'Notification processed (missing IDs)' });
             }
-            console.log(messageContent);
-            const notificationType = messageContent.notificationType;
+            const notificationType = messageContent.eventType;
             console.log(`Processing ${notificationType} notification for campaign ${campaignId}, contact ${contactId}`);
 
             if (notificationType === 'Bounce') {
