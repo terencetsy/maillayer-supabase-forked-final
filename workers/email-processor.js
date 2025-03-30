@@ -2,12 +2,12 @@
 require('dotenv').config();
 const Bull = require('bull');
 const mongoose = require('mongoose');
-const AWS = require('aws-sdk');
-const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const crypto = require('crypto');
 const { RateLimiter } = require('limiter');
 const cheerio = require('cheerio');
 const Redis = require('ioredis');
+const { SESClient, SendEmailCommand, GetSendQuotaCommand } = require('@aws-sdk/client-ses');
+const { SNSClient } = require('@aws-sdk/client-sns');
 
 // Load our CommonJS compatible config
 const config = require('../src/lib/configCommonJS');
@@ -700,7 +700,8 @@ async function initializeQueues() {
 
             // Check quota and verify connection
             try {
-                const quotaResponse = await ses.getSendQuota().promise();
+                const quotaCommand = new GetSendQuotaCommand({});
+                const quotaResponse = await sesClient.send(quotaCommand);
 
                 // Calculate remaining quota
                 const remainingQuota = quotaResponse.Max24HourSend - quotaResponse.SentLast24Hours;
