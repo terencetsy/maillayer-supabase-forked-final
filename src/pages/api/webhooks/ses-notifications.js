@@ -30,10 +30,33 @@ export default async function handler(req, res) {
                 return res.status(500).json({ message: 'Failed to confirm subscription' });
             }
         }
-
+        console.log(
+            'Received SNS notification:',
+            JSON.stringify({
+                Type: snsMessage.Type,
+                TopicArn: snsMessage.TopicArn,
+                MessageId: snsMessage.MessageId,
+            })
+        );
         // Handle notification messages
         if (snsMessage.Type === 'Notification') {
             const messageContent = JSON.parse(snsMessage.Message);
+
+            if (messageContent.mail) {
+                console.log(
+                    'Mail object structure:',
+                    JSON.stringify({
+                        messageId: messageContent.mail.messageId,
+                        timestamp: messageContent.mail.timestamp,
+                        source: messageContent.mail.source,
+                        hasHeaders: !!messageContent.mail.headers,
+                        hasTags: !!messageContent.mail.tags,
+                        hasMessageTags: !!messageContent.mail.messageTags,
+                        destination: messageContent.mail.destination,
+                    })
+                );
+            }
+
             const mailData = messageContent.mail;
 
             if (!mailData) {
@@ -50,28 +73,48 @@ export default async function handler(req, res) {
                 if (mailData.tags.contactId) {
                     contactId = mailData.tags.contactId[0];
                 }
+            } else if (mailData.messageTags) {
+                // Try the messageTag format (SES might use this format instead)
+                const campaignTag = mailData.messageTag?.find((tag) => tag.name === 'campaignId');
+                const contactTag = mailData.messageTag?.find((tag) => tag.name === 'contactId');
+
+                if (campaignTag) campaignId = campaignTag.value;
+                if (contactTag) contactId = contactTag.value;
+            } else {
+                // As a fallback, try to extract from headers or message ID
+                // Common pattern is to include campaign ID in the message ID or headers
+                if (mailData.commonHeaders && mailData.commonHeaders.messageId) {
+                    const msgIdMatch = mailData.commonHeaders.messageId.match(/campaign[-_]([a-f0-9]+)/i);
+                    if (msgIdMatch && msgIdMatch[1]) {
+                        campaignId = msgIdMatch[1];
+                    }
+                }
             }
 
             if (!campaignId || !contactId) {
-                console.warn('Missing campaignId or contactId in notification:', messageContent);
+                console.warn('Missing campaignId or contactId in notification. Message data:', JSON.stringify(mailData));
                 return res.status(200).json({ message: 'Notification processed (missing IDs)' });
             }
 
             const notificationType = messageContent.notificationType;
 
             if (notificationType === 'Bounce') {
+                console.log(
+                    'Bounce object structure:',
+                    JSON.stringify({
+                        bounceType: messageContent.bounce.bounceType,
+                        bounceSubType: messageContent.bounce.bounceSubType,
+                        timestamp: messageContent.bounce.timestamp,
+                        feedbackId: messageContent.bounce.feedbackId,
+                        reportingMTA: messageContent.bounce.reportingMTA,
+                        hasRecipients: !!messageContent.bounce.bouncedRecipients,
+                        recipientCount: messageContent.bounce.bouncedRecipients?.length,
+                    })
+                );
                 const bounceInfo = messageContent.bounce;
                 const recipients = bounceInfo.bouncedRecipients;
                 const bounceType = bounceInfo.bounceType; // Permanent or Transient
                 const subType = bounceInfo.bounceSubType;
-
-                console.log('Bounce received:', {
-                    type: bounceType,
-                    subType,
-                    recipients: recipients.map((r) => r.emailAddress),
-                    campaignId,
-                    contactId,
-                });
 
                 // Only mark as unsubscribed for permanent bounces
                 const isPermanent = bounceType === 'Permanent';

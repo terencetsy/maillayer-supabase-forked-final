@@ -159,7 +159,7 @@ export default async function handler(req, res) {
                         })
                         .promise();
 
-                    // Create event destination for the configuration set
+                    // Create event destination for the configuration set with enhanced configuration
                     await ses
                         .createConfigurationSetEventDestination({
                             ConfigurationSetName: configurationSetName,
@@ -173,10 +173,64 @@ export default async function handler(req, res) {
                             },
                         })
                         .promise();
+
+                    // Set the configuration set to include all headers and original content
+                    // This is critical to ensure that message tags are passed through
+                    try {
+                        await ses
+                            .updateConfigurationSet({
+                                ConfigurationSet: {
+                                    Name: configurationSetName,
+                                },
+                                EventDestinationDefinition: {
+                                    Enabled: true,
+                                    MatchingEventTypes: ['send', 'delivery', 'bounce', 'complaint', 'reject'],
+                                    SNSDestination: {
+                                        TopicARN: topicArn,
+                                    },
+                                    // Important: Include headers and message tags
+                                    IncludeHeaders: true,
+                                    IncludeOriginalMessage: true,
+                                },
+                            })
+                            .promise();
+                    } catch (configSetUpdateError) {
+                        console.warn('Configuration set update error (non-fatal):', configSetUpdateError.message);
+                        // Continue even if this specific update fails
+                    }
                 } catch (configError) {
                     console.warn('Configuration set setup error (non-fatal):', configError.message);
                     // Continue even if config set creation fails
                 }
+            }
+
+            // Add the identity to notification settings to ensure all attributes are included
+            try {
+                await ses
+                    .setIdentityHeadersInNotificationsEnabled({
+                        Identity: domain,
+                        Enabled: true,
+                        NotificationType: 'Bounce',
+                    })
+                    .promise();
+
+                await ses
+                    .setIdentityHeadersInNotificationsEnabled({
+                        Identity: domain,
+                        Enabled: true,
+                        NotificationType: 'Complaint',
+                    })
+                    .promise();
+
+                // Also set up feedback forwarding
+                await ses
+                    .setIdentityFeedbackForwardingEnabled({
+                        Identity: domain,
+                        ForwardingEnabled: true,
+                    })
+                    .promise();
+            } catch (identitySettingsError) {
+                console.warn('Identity notification settings error (non-fatal):', identitySettingsError.message);
             }
 
             // Update sendingDomain and tracking information in brand

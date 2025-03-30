@@ -816,7 +816,7 @@ async function initializeQueues() {
                                             ReplyToAddresses: [replyTo || fromEmail],
                                             // Configure feedback notifications
                                             ConfigurationSetName: brand.sesConfigurationSet,
-                                            Tags: [
+                                            MessageTags: [
                                                 {
                                                     Name: 'campaignId',
                                                     Value: campaignId.toString(),
