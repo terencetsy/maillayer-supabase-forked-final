@@ -173,6 +173,26 @@ export default async function handler(req, res) {
                             },
                         })
                         .promise();
+
+                    await ses
+                        .updateConfigurationSet({
+                            ConfigurationSet: {
+                                Name: configurationSetName,
+                            },
+                            MessageTagsConfiguration: {
+                                MessageTags: [
+                                    {
+                                        Name: 'campaignId',
+                                        DefaultValue: 'none',
+                                    },
+                                    {
+                                        Name: 'contactId',
+                                        DefaultValue: 'none',
+                                    },
+                                ],
+                            },
+                        })
+                        .promise();
                 } catch (configError) {
                     console.warn('Configuration set setup error (non-fatal):', configError.message);
                     // Continue even if config set creation fails
