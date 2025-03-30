@@ -825,6 +825,11 @@ async function initializeQueues() {
                                                     Name: 'contactId',
                                                     Value: contact._id.toString(),
                                                 },
+                                                // Add additional tag for tracking
+                                                {
+                                                    Name: 'trackingId',
+                                                    Value: `c${campaignId}-u${contact._id}`,
+                                                },
                                             ],
                                         })
                                         .promise();
