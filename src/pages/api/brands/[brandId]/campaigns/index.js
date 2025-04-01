@@ -3,6 +3,7 @@ import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
 import { getCampaignsByBrandId, createCampaign } from '@/services/campaignService';
 import { getBrandById } from '@/services/brandService';
+import { getCampaignStats } from '@/services/trackingService';
 
 export default async function handler(req, res) {
     try {
@@ -36,8 +37,40 @@ export default async function handler(req, res) {
         // GET request - get campaigns for a brand
         if (req.method === 'GET') {
             try {
+                // Fetch campaigns
                 const campaigns = await getCampaignsByBrandId(brandId, userId);
-                return res.status(200).json(campaigns);
+                // For non-draft campaigns that have been sent, fetch additional stats
+                const campaignsWithStats = await Promise.all(
+                    campaigns.map(async (campaign) => {
+                        if (campaign.status !== 'draft' && campaign.status !== 'scheduled') {
+                            try {
+                                // Get detailed stats for each campaign
+                                const stats = await getCampaignStats(campaign._id);
+                                console.log('stats', stats);
+                                // Calculate open rate
+                                const openRate = stats.recipients > 0 ? (((stats.open?.unique || 0) / stats.recipients) * 100).toFixed(1) : 0;
+
+                                // Add the additional stats to the campaign object
+                                return {
+                                    ...campaign.toObject(),
+                                    statistics: {
+                                        ...stats,
+                                        openRate,
+                                        unsubscribedCount: stats.unsubscribed?.total || 0,
+                                        bouncedCount: stats.bounce?.total || 0,
+                                    },
+                                };
+                            } catch (error) {
+                                console.warn(`Error fetching stats for campaign ${campaign._id}:`, error);
+                                // Return campaign without stats if there was an error
+                                return campaign;
+                            }
+                        }
+                        return campaign;
+                    })
+                );
+
+                return res.status(200).json(campaignsWithStats);
             } catch (error) {
                 console.error('Error fetching campaigns:', error);
                 return res.status(500).json({ message: 'Error fetching campaigns' });

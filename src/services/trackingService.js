@@ -52,64 +52,162 @@ export async function trackEvent(campaignId, contactId, email, eventType, metada
     }
 }
 
-export async function getCampaignStats(campaignId) {
-    await connectToDatabase();
-
+export const getCampaignStats = async (campaignId) => {
     try {
+        // Create the tracking model for this campaign
         const TrackingModel = createTrackingModel(campaignId);
 
-        // Get aggregate stats
-        const stats = await TrackingModel.aggregate([
-            { $match: { campaignId: new mongoose.Types.ObjectId(campaignId) } },
+        // Get basic stats from the campaign model
+        const campaign = await Campaign.findById(campaignId);
+        if (!campaign) {
+            throw new Error('Campaign not found');
+        }
+
+        // Get recipients count from campaign stats
+        const recipients = campaign.stats?.recipients || 0;
+
+        // Aggregate open events
+        const openStats = await TrackingModel.aggregate([
+            { $match: { eventType: 'open' } },
             {
                 $group: {
-                    _id: '$eventType',
-                    count: { $sum: 1 },
-                    uniqueContacts: { $addToSet: '$contactId' },
-                },
-            },
-            {
-                $project: {
-                    _id: 0,
-                    eventType: '$_id',
-                    count: 1,
-                    uniqueCount: { $size: '$uniqueContacts' },
+                    _id: null,
+                    total: { $sum: 1 },
+                    unique: { $addToSet: '$email' },
                 },
             },
         ]);
 
-        // Convert to a more usable format
-        const formattedStats = stats.reduce((result, stat) => {
-            result[stat.eventType] = {
-                total: stat.count,
-                unique: stat.uniqueCount,
-            };
-            return result;
-        }, {});
+        // Aggregate click events
+        const clickStats = await TrackingModel.aggregate([
+            { $match: { eventType: 'click' } },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    unique: { $addToSet: '$email' },
+                },
+            },
+        ]);
 
-        // Get the campaign to calculate rates
-        const campaign = await Campaign.findById(campaignId);
+        // Aggregate bounce events
+        const bounceStats = await TrackingModel.aggregate([
+            { $match: { eventType: 'bounce' } },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    unique: { $addToSet: '$email' },
+                },
+            },
+        ]);
 
-        if (campaign && campaign.stats.recipients > 0) {
-            // Calculate rates
-            const openRate = ((formattedStats.open?.unique || 0) / campaign.stats.recipients) * 100;
-            const clickRate = ((formattedStats.click?.unique || 0) / campaign.stats.recipients) * 100;
+        // Aggregate complaint events
+        const complaintStats = await TrackingModel.aggregate([
+            { $match: { eventType: 'complaint' } },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    unique: { $addToSet: '$email' },
+                },
+            },
+        ]);
 
-            return {
-                ...formattedStats,
-                recipients: campaign.stats.recipients,
-                openRate: parseFloat(openRate.toFixed(2)),
-                clickRate: parseFloat(clickRate.toFixed(2)),
-                // Include more derived stats as needed
-            };
-        }
+        // Get unsubscribe events - these might be stored in Contact model rather than tracking events
+        // Let's check both sources
+        const unsubscribeStats = await TrackingModel.aggregate([
+            { $match: { eventType: 'unsubscribe' } },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    unique: { $addToSet: '$email' },
+                },
+            },
+        ]);
 
-        return formattedStats;
+        // Also check contacts that unsubscribed from this campaign
+        const unsubscribedContactsCount = await Contact.countDocuments({
+            unsubscribedFromCampaign: mongoose.Types.ObjectId(campaignId),
+            isUnsubscribed: true,
+        });
+
+        // Calculate total and unique counts for each event type
+        const open =
+            openStats.length > 0
+                ? {
+                      total: openStats[0].total,
+                      unique: openStats[0].unique.length,
+                  }
+                : { total: 0, unique: 0 };
+
+        const click =
+            clickStats.length > 0
+                ? {
+                      total: clickStats[0].total,
+                      unique: clickStats[0].unique.length,
+                  }
+                : { total: 0, unique: 0 };
+
+        const bounce =
+            bounceStats.length > 0
+                ? {
+                      total: bounceStats[0].total,
+                      unique: bounceStats[0].unique.length,
+                  }
+                : { total: 0, unique: 0 };
+
+        const complaint =
+            complaintStats.length > 0
+                ? {
+                      total: complaintStats[0].total,
+                      unique: complaintStats[0].unique.length,
+                  }
+                : { total: 0, unique: 0 };
+
+        const unsubscribed = {
+            total: (unsubscribeStats.length > 0 ? unsubscribeStats[0].total : 0) + unsubscribedContactsCount,
+            unique: (unsubscribeStats.length > 0 ? unsubscribeStats[0].unique.length : 0) + unsubscribedContactsCount,
+        };
+
+        // Calculate rates
+        const openRate = recipients > 0 ? ((open.unique / recipients) * 100).toFixed(1) : 0;
+        const clickRate = recipients > 0 ? ((click.unique / recipients) * 100).toFixed(1) : 0;
+        const bounceRate = recipients > 0 ? ((bounce.unique / recipients) * 100).toFixed(1) : 0;
+        const complaintRate = recipients > 0 ? ((complaint.unique / recipients) * 100).toFixed(1) : 0;
+
+        return {
+            recipients,
+            open,
+            click,
+            bounce,
+            complaint,
+            unsubscribed,
+            openRate,
+            clickRate,
+            bounceRate,
+            complaintRate,
+            // Include raw campaign stats for cross-reference
+            campaignStats: campaign.stats,
+        };
     } catch (error) {
         console.error('Error getting campaign stats:', error);
-        throw error;
+        // Return basic stats if we encounter an error
+        return {
+            recipients: 0,
+            open: { total: 0, unique: 0 },
+            click: { total: 0, unique: 0 },
+            bounce: { total: 0, unique: 0 },
+            complaint: { total: 0, unique: 0 },
+            unsubscribed: { total: 0, unique: 0 },
+            openRate: '0',
+            clickRate: '0',
+            bounceRate: '0',
+            complaintRate: '0',
+        };
     }
-}
+};
 
 export async function getCampaignEvents(campaignId, options = {}) {
     await connectToDatabase();

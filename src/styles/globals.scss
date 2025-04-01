@@ -7830,3 +7830,100 @@ h4 {
         transform: rotate(360deg);
     }
 }
+
+/* Add these to your globals.scss file or create a new CSS module */
+
+/* Campaign Stats columns styling */
+.openrate-col,
+.unsub-col,
+.bounce-col {
+    width: 12%;
+}
+
+/* Stats value display */
+.stats-value {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.stats-value .stats-icon {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Icon colors for different stats */
+.openrate-col .stats-icon {
+    color: #5d87ff;
+}
+
+.unsub-col .stats-icon {
+    color: #f59e0b;
+}
+
+.bounce-col .stats-icon {
+    color: #ef4444;
+}
+
+/* Status badge enhancements */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge.draft {
+    background-color: rgba(100, 116, 139, 0.2);
+    color: #cbd5e1;
+}
+
+.status-badge.scheduled {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
+.status-badge.sending,
+.status-badge.queued {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.status-badge.sent {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+}
+
+.status-badge.failed {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .unsub-col,
+    .bounce-col {
+        display: none;
+    }
+
+    .campaign-col {
+        width: 30%;
+    }
+
+    .openrate-col {
+        width: 15%;
+    }
+}
+
+@media (max-width: 992px) {
+    .openrate-col {
+        display: none;
+    }
+
+    .campaign-col {
+        width: 40%;
+    }
+}
