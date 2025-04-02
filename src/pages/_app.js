@@ -9,7 +9,11 @@ if (typeof window === 'undefined' && !process.env.NEXTAUTH_URL) {
 
 function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     return (
-        <SessionProvider session={session}>
+        <SessionProvider
+            session={session}
+            refetchInterval={0}
+            refetchOnWindowFocus={false}
+        >
             <Head>
                 <meta
                     name="viewport"
