@@ -53,7 +53,7 @@ export default async function handler(req, res) {
                 // Process the tracking in the background
                 // This won't block the response
                 setTimeout(async () => {
-                    const geoData = getGeoData(cleanIp);
+                    const geoData = await getGeoData(cleanIp);
 
                     try {
                         await trackEvent(
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
                 }
 
                 // Get geolocation data (this is fast since it's local)
-                const geoData = getGeoData(cleanIp);
+                const geoData = await getGeoData(cleanIp);
 
                 // Track click event with geolocation data
                 await trackEvent(
