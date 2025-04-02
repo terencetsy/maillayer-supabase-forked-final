@@ -61,6 +61,10 @@ const CampaignSchema = new mongoose.Schema({
     sentAt: {
         type: Date,
     },
+    totalRecipients: {
+        type: Number,
+        default: 0,
+    },
     stats: {
         recipients: {
             type: Number,

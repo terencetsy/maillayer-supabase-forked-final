@@ -151,11 +151,10 @@ export default async function handler(req, res) {
                                 removeOnComplete: false,
                             }
                         );
-
+                        updateData.totalRecipients = await getActiveRecipientsCount(brandId, contactListIds || campaign.contactListIds);
                         // Update stats with recipient count
                         updateData.stats = {
                             ...campaign.stats,
-                            recipients: await getRecipientsCount(brandId, contactListIds || campaign.contactListIds),
                         };
                     }
                 } else if (status) {
@@ -177,16 +176,19 @@ export default async function handler(req, res) {
         }
 
         // Helper function to get total recipients count
-        async function getRecipientsCount(brandId, contactListIds) {
+        async function getActiveRecipientsCount(brandId, contactListIds) {
             if (!contactListIds || contactListIds.length === 0) return 0;
 
-            const ContactList = mongoose.models.ContactList;
-            const lists = await ContactList.find({
-                _id: { $in: contactListIds.map((id) => new mongoose.Types.ObjectId(id)) },
+            const Contact = mongoose.models.Contact;
+
+            // Count only active contacts across all selected lists
+            const activeCount = await Contact.countDocuments({
+                listId: { $in: contactListIds.map((id) => new mongoose.Types.ObjectId(id)) },
                 brandId: new mongoose.Types.ObjectId(brandId),
+                status: 'active', // Only count active contacts
             });
 
-            return lists.reduce((total, list) => total + (list.contactCount || 0), 0);
+            return activeCount;
         }
 
         // DELETE request - delete a campaign

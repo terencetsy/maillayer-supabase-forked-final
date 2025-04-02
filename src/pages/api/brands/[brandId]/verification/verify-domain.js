@@ -17,6 +17,8 @@ import {
     SetIdentityNotificationAttributesCommand,
 } from '@aws-sdk/client-ses';
 import { SNSClient, ListTopicsCommand, CreateTopicCommand, SubscribeCommand } from '@aws-sdk/client-sns';
+import { SESv2Client, PutEmailIdentityConfigurationSetAttributesCommand } from '@aws-sdk/client-sesv2';
+
 import config from '@/lib/config';
 
 export default async function handler(req, res) {
@@ -69,6 +71,14 @@ export default async function handler(req, res) {
 
         // Initialize AWS SES and SNS clients
         const sesClient = new SESClient({
+            region: brand.awsRegion,
+            credentials: {
+                accessKeyId: brand.awsAccessKey,
+                secretAccessKey: brand.awsSecretKey,
+            },
+        });
+
+        const sesv2Client = new SESv2Client({
             region: brand.awsRegion,
             credentials: {
                 accessKeyId: brand.awsAccessKey,
@@ -234,6 +244,20 @@ export default async function handler(req, res) {
                 );
             } catch (identityError) {
                 console.warn('Identity configuration error (non-fatal):', identityError.message);
+            }
+
+            // Set the configuration set as the default for the domain identity
+            try {
+                await sesv2Client.send(
+                    new PutEmailIdentityConfigurationSetAttributesCommand({
+                        EmailIdentity: domain,
+                        ConfigurationSetName: configurationSetName,
+                    })
+                );
+                console.log(`Successfully set ${configurationSetName} as the default configuration set for ${domain}`);
+            } catch (defaultConfigError) {
+                console.warn('Error setting default configuration set (non-fatal):', defaultConfigError.message);
+                // Continue even if setting default configuration set fails
             }
 
             // Update sendingDomain and tracking information in brand
