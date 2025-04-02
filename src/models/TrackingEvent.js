@@ -26,7 +26,7 @@ const TrackingEventSchema = new mongoose.Schema(
         eventType: {
             type: String,
             required: true,
-            enum: ['open', 'click', 'bounce', 'complaint', 'delivery'],
+            enum: ['open', 'click', 'bounce', 'complaint', 'delivery', 'unsubscribe'],
         },
         metadata: {
             type: mongoose.Schema.Types.Mixed,

@@ -665,7 +665,7 @@ async function initializeQueues() {
                         // Load a chunk of contacts
                         const contacts = await Contact.find({
                             listId: listId,
-                            isUnsubscribed: { $ne: true },
+                            status: 'active',
                         })
                             .sort({ _id: 1 }) // Ensure consistent ordering
                             .skip(startIndex)
