@@ -47,12 +47,16 @@ export default async function handler(req, res) {
                                 // Get detailed stats for each campaign
                                 const stats = await getCampaignStats(campaign._id);
                                 console.log('stats', stats);
+
                                 // Calculate open rate
                                 const openRate = stats.recipients > 0 ? (((stats.open?.unique || 0) / stats.recipients) * 100).toFixed(1) : 0;
 
+                                // Convert campaign to plain object safely
+                                const campaignObject = typeof campaign.toObject === 'function' ? campaign.toObject() : { ...campaign };
+
                                 // Add the additional stats to the campaign object
                                 return {
-                                    ...campaign.toObject(),
+                                    ...campaignObject,
                                     statistics: {
                                         ...stats,
                                         openRate,

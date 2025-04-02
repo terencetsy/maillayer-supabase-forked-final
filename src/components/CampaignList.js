@@ -4,6 +4,51 @@ import { formatDistance } from 'date-fns';
 import { Mail, Eye, Edit, Copy, Trash, PieChart, Users, AlertOctagon } from 'lucide-react';
 
 const CampaignList = ({ campaigns, brandId }) => {
+    const handleDuplicate = async (campaignId, campaignName) => {
+        // Implementation for duplicating campaign
+        // You'll need to create an API endpoint for this
+        try {
+            const response = await fetch(`/api/brands/${brandId}/campaigns/${campaignId}/duplicate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name: `${campaignName} (Copy)` }),
+            });
+
+            if (response.ok) {
+                // Refresh the page or update the list
+                window.location.reload();
+            } else {
+                alert('Failed to duplicate campaign');
+            }
+        } catch (error) {
+            console.error('Error duplicating campaign:', error);
+            alert('An error occurred while duplicating the campaign');
+        }
+    };
+
+    // Function to handle campaign deletion
+    const handleDelete = async (campaignId) => {
+        if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+            try {
+                const response = await fetch(`/api/brands/${brandId}/campaigns/${campaignId}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    // Refresh the page or update the list
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete campaign');
+                }
+            } catch (error) {
+                console.error('Error deleting campaign:', error);
+                alert('An error occurred while deleting the campaign');
+            }
+        }
+    };
+
     // Function to render the status badge
     const renderStatusBadge = (status) => {
         switch (status) {
@@ -108,21 +153,17 @@ const CampaignList = ({ campaigns, brandId }) => {
                                             <Edit size={16} />
                                         </Link>
                                     )}
-                                    <Link
-                                        href={`/brands/${brandId}/campaigns/${campaign._id}/duplicate`}
+                                    <div
                                         className="duplicate-btn"
-                                        title="Duplicate Campaign"
+                                        onClick={() => handleDuplicate(campaign._id, campaign.name)}
                                     >
                                         <Copy size={16} />
-                                    </Link>
+                                    </div>
                                     {campaign.status === 'draft' && (
                                         <button
                                             className="delete-btn"
                                             title="Delete Campaign"
-                                            onClick={() => {
-                                                // Delete functionality would be implemented here
-                                                alert('Delete functionality would be implemented here');
-                                            }}
+                                            onClick={() => handleDelete(campaign._id)}
                                         >
                                             <Trash size={16} />
                                         </button>

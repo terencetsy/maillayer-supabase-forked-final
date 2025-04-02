@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import BrandLayout from '@/components/BrandLayout';
-import { PlusCircle, Search, Filter } from 'lucide-react';
+import { PlusCircle, Search, Filter, Mail } from 'lucide-react';
 import CampaignForm from '@/components/CampaignForm';
 import CampaignList from '@/components/CampaignList';
 
@@ -148,7 +148,9 @@ export default function BrandCampaigns() {
                         <>
                             {campaigns.length === 0 ? (
                                 <div className="empty-state">
-                                    <div className="empty-icon">📧</div>
+                                    <div className="icon-wrapper">
+                                        <Mail size={36} />
+                                    </div>
                                     <h2>No campaigns yet</h2>
                                     <p>Create your first email campaign to start engaging with your audience</p>
                                     <button
