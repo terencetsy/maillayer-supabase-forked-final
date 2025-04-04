@@ -63,6 +63,8 @@ export const authOptions = {
         strategy: 'jwt',
         maxAge: 30 * 24 * 60 * 60, // 30 days
         updateAge: 7 * 24 * 60 * 60, // 7 days
+        refreshWhenOffline: false, // Don't refresh when offline
+        refreshInterval: 0,
     },
     // Use the secret from our centralized config
     secret: config.nextAuthSecret,
