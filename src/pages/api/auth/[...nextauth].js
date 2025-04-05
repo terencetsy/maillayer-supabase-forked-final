@@ -66,6 +66,9 @@ export const authOptions = {
         refreshWhenOffline: false, // Don't refresh when offline
         refreshInterval: 0,
     },
+    jwt: {
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+    },
     // Use the secret from our centralized config
     secret: config.nextAuthSecret,
     // Use the environment flag from our config for debug mode
