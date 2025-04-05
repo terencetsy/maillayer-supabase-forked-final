@@ -1,13 +1,12 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install PM2 globally
-RUN npm install -g pm2
-
-# Copy package files and install dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies
+RUN npm ci
 
 # Copy the rest of the application
 COPY . .
@@ -15,11 +14,32 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs
 
-# Build the Next.js app
-RUN npm run build
-
-# Make worker scripts executable
+# Make worker scripts executable 
 RUN chmod +x workers/*.js || true
+
+# Try to build with debugging information
+RUN npm run build || (echo "Build failed with error code $?" && exit 1)
+
+# Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install PM2 globally
+RUN npm install -g pm2
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Copy built application from builder stage
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/ecosystem.config.js ./
+COPY --from=builder /app/workers ./workers
+COPY --from=builder /app/logs ./logs
 
 # Expose port
 EXPOSE 3000

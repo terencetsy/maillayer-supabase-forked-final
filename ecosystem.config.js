@@ -4,7 +4,7 @@ module.exports = {
         {
             name: 'maillayer-nextjs',
             script: 'npm',
-            args: 'start', // Use 'start' instead of 'dev' for production
+            args: 'start', // Use npm start to run the built Next.js app
             env: {
                 NODE_ENV: 'production', // Change to production
                 PORT: 3000,
