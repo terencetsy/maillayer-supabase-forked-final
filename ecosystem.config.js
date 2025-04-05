@@ -6,7 +6,7 @@ module.exports = {
             script: 'npm',
             args: 'run dev -- -H 0.0.0.0',
             env: {
-                NODE_ENV: 'development',
+                NODE_ENV: 'production',
             },
             // Add log configuration
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
@@ -18,7 +18,7 @@ module.exports = {
             name: 'email-worker',
             script: 'workers/email-processor.js',
             env: {
-                NODE_ENV: 'development',
+                NODE_ENV: 'production',
                 WORKER_DEBUG: 'true', // Add this for more verbose debugging
             },
             // Add better stability and logging for this critical worker
@@ -36,7 +36,7 @@ module.exports = {
             name: 'cron-checker',
             script: 'workers/cron-checker.js',
             env: {
-                NODE_ENV: 'development',
+                NODE_ENV: 'production',
                 WORKER_DEBUG: 'true',
             },
             restart_delay: 3000,
@@ -51,7 +51,7 @@ module.exports = {
             name: 'campaign-manager',
             script: 'workers/campaign-manager.js',
             env: {
-                NODE_ENV: 'development',
+                NODE_ENV: 'production',
                 WORKER_DEBUG: 'true',
             },
             restart_delay: 3000,
