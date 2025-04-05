@@ -612,7 +612,10 @@ export default function CampaignDetail() {
                             </div>
                         )}
 
-                        <GeoStats events={events} />
+                        <GeoStats
+                            campaignId={campaignId}
+                            brandId={id}
+                        />
                     </div>
                 )}
 

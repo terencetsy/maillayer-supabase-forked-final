@@ -48,6 +48,7 @@
         "react": "^19.0.0",
         "react-datepicker": "^8.2.1",
         "react-dom": "^19.0.0",
+        "recharts": "^2.15.2",
         "sass": "^1.64.2"
     },
     "devDependencies": {
