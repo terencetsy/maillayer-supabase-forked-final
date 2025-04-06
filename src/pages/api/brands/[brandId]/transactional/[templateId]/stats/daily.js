@@ -45,10 +45,7 @@ export default async function handler(req, res) {
         const endDate = new Date();
         const startDate = subDays(endDate, days);
 
-        console.log('Date range:', startDate, endDate);
-        console.log('Template ID:', template._id);
-
-        // Aggregate daily stats with improved date handling
+        // Aggregate daily stats
         const dailySendStats = await TransactionalLog.aggregate([
             {
                 $match: {
@@ -59,26 +56,25 @@ export default async function handler(req, res) {
                 },
             },
             {
-                $addFields: {
-                    // Convert to date string in UTC to handle timezone issues
-                    dateString: {
-                        $dateToString: {
-                            format: '%Y-%m-%d',
-                            date: '$sentAt',
-                        },
-                    },
-                },
-            },
-            {
                 $group: {
-                    _id: '$dateString',
+                    _id: {
+                        year: { $year: '$sentAt' },
+                        month: { $month: '$sentAt' },
+                        day: { $dayOfMonth: '$sentAt' },
+                    },
                     sent: { $sum: 1 },
+                    date: { $first: '$sentAt' },
                 },
             },
             {
                 $project: {
                     _id: 0,
-                    date: '$_id',
+                    date: {
+                        $dateToString: {
+                            format: '%Y-%m-%d',
+                            date: '$date',
+                        },
+                    },
                     sent: 1,
                 },
             },
@@ -87,14 +83,14 @@ export default async function handler(req, res) {
             },
         ]);
 
-        // Aggregate daily open stats with improved event handling
+        // Aggregate daily open stats
         const dailyOpenStats = await TransactionalLog.aggregate([
             {
                 $match: {
                     templateId: template._id,
                     brandId: template.brandId,
                     userId,
-                    events: { $elemMatch: { type: 'open' } },
+                    'events.type': 'open',
                     sentAt: { $gte: startDate, $lte: endDate },
                 },
             },
@@ -107,26 +103,25 @@ export default async function handler(req, res) {
                 },
             },
             {
-                $addFields: {
-                    // Convert event timestamp to date string in UTC
-                    eventDateString: {
-                        $dateToString: {
-                            format: '%Y-%m-%d',
-                            date: '$events.timestamp',
-                        },
-                    },
-                },
-            },
-            {
                 $group: {
-                    _id: '$eventDateString',
+                    _id: {
+                        year: { $year: '$events.timestamp' },
+                        month: { $month: '$events.timestamp' },
+                        day: { $dayOfMonth: '$events.timestamp' },
+                    },
                     opens: { $sum: 1 },
+                    date: { $first: '$events.timestamp' },
                 },
             },
             {
                 $project: {
                     _id: 0,
-                    date: '$_id',
+                    date: {
+                        $dateToString: {
+                            format: '%Y-%m-%d',
+                            date: '$date',
+                        },
+                    },
                     opens: 1,
                 },
             },
@@ -135,14 +130,14 @@ export default async function handler(req, res) {
             },
         ]);
 
-        // Aggregate daily click stats with improved event handling
+        // Aggregate daily click stats
         const dailyClickStats = await TransactionalLog.aggregate([
             {
                 $match: {
                     templateId: template._id,
                     brandId: template.brandId,
                     userId,
-                    events: { $elemMatch: { type: 'click' } },
+                    'events.type': 'click',
                     sentAt: { $gte: startDate, $lte: endDate },
                 },
             },
@@ -155,26 +150,25 @@ export default async function handler(req, res) {
                 },
             },
             {
-                $addFields: {
-                    // Convert event timestamp to date string in UTC
-                    eventDateString: {
-                        $dateToString: {
-                            format: '%Y-%m-%d',
-                            date: '$events.timestamp',
-                        },
-                    },
-                },
-            },
-            {
                 $group: {
-                    _id: '$eventDateString',
+                    _id: {
+                        year: { $year: '$events.timestamp' },
+                        month: { $month: '$events.timestamp' },
+                        day: { $dayOfMonth: '$events.timestamp' },
+                    },
                     clicks: { $sum: 1 },
+                    date: { $first: '$events.timestamp' },
                 },
             },
             {
                 $project: {
                     _id: 0,
-                    date: '$_id',
+                    date: {
+                        $dateToString: {
+                            format: '%Y-%m-%d',
+                            date: '$date',
+                        },
+                    },
                     clicks: 1,
                 },
             },
@@ -182,24 +176,6 @@ export default async function handler(req, res) {
                 $sort: { date: 1 },
             },
         ]);
-
-        // Log a sample of raw data for debugging
-        const sampleLogs = await TransactionalLog.find({
-            templateId: template._id,
-            brandId: template.brandId,
-            userId,
-            sentAt: { $gte: startDate, $lte: endDate },
-        }).limit(3);
-
-        console.log('Sample logs found:', sampleLogs.length);
-        console.log(
-            'Sample logs dates:',
-            sampleLogs.map((log) => log.sentAt)
-        );
-        console.log(
-            'Sample event counts:',
-            sampleLogs.map((log) => log.events?.length || 0)
-        );
 
         // Generate date range for all days
         const dateRange = [];
@@ -236,15 +212,11 @@ export default async function handler(req, res) {
             }
         });
 
-        console.log('Daily send stats sample:', dailySendStats.slice(0, 3));
-        console.log('Daily open stats sample:', dailyOpenStats.slice(0, 3));
-        console.log('Daily click stats sample:', dailyClickStats.slice(0, 3));
-
         return res.status(200).json({
             stats: dateRange,
         });
     } catch (error) {
         console.error('Error fetching daily template stats:', error);
-        return res.status(500).json({ message: 'Error fetching daily stats', error: error.message });
+        return res.status(500).json({ message: 'Error fetching daily stats' });
     }
 }

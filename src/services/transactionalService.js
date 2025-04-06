@@ -224,27 +224,50 @@ export async function trackTransactionalEvent(templateId, eventType, metadata = 
 
             const result = await TransactionalTemplate.updateOne({ _id: new mongoose.Types.ObjectId(templateId) }, { $inc: { [updateField]: 1 } });
 
-            console.log(`Updated ${updateField} for template ${templateId}:`, result);
-
             // Also update TransactionalLog if email is provided
             if (metadata.email) {
-                const logResult = await TransactionalLog.findOneAndUpdate(
-                    {
-                        templateId: new mongoose.Types.ObjectId(templateId),
-                        to: metadata.email,
-                    },
-                    {
-                        $push: {
-                            events: {
-                                type: eventType,
-                                timestamp: new Date(),
-                                metadata,
-                            },
-                        },
-                    }
-                );
+                // First, check if there's already an event of this type
+                const existingLog = await TransactionalLog.findOne({
+                    templateId: new mongoose.Types.ObjectId(templateId),
+                    to: metadata.email,
+                    'events.type': eventType,
+                });
 
-                console.log(`Updated log entry for ${metadata.email}:`, logResult ? 'Success' : 'Not found');
+                let logResult;
+
+                if (existingLog) {
+                    // Update the existing event's timestamp and metadata
+                    logResult = await TransactionalLog.findOneAndUpdate(
+                        {
+                            templateId: new mongoose.Types.ObjectId(templateId),
+                            to: metadata.email,
+                            'events.type': eventType,
+                        },
+                        {
+                            $set: {
+                                'events.$.timestamp': new Date(),
+                                'events.$.metadata': metadata,
+                            },
+                        }
+                    );
+                } else {
+                    // No existing event of this type, add a new one
+                    logResult = await TransactionalLog.findOneAndUpdate(
+                        {
+                            templateId: new mongoose.Types.ObjectId(templateId),
+                            to: metadata.email,
+                        },
+                        {
+                            $push: {
+                                events: {
+                                    type: eventType,
+                                    timestamp: new Date(),
+                                    metadata,
+                                },
+                            },
+                        }
+                    );
+                }
             }
 
             return true;
