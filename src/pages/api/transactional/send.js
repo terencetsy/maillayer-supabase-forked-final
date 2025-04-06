@@ -87,15 +87,22 @@ export default async function handler(req, res) {
             content = content.replace(regex, variables[key]);
         });
 
-        // Generate tracking tokens
+        // Generate tracking token
         const trackingToken = generateTrackingToken(
             template._id.toString(),
             'txn', // Use 'txn' as contactId for transactional emails
             to
         );
 
-        const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${trackingToken}&templateId=${template._id}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
-        content = content + trackingPixel;
+        // Create a tracking pixel with proper URL encoding
+        const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${encodeURIComponent(trackingToken)}&templateId=${encodeURIComponent(template._id)}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
+
+        // Add tracking pixel at the end of the content, right before the closing body tag if possible
+        if (content.includes('</body>')) {
+            content = content.replace('</body>', `${trackingPixel}</body>`);
+        } else {
+            content = content + trackingPixel;
+        }
 
         // Initialize SES client
         const ses = new AWS.SES({
@@ -152,6 +159,7 @@ export default async function handler(req, res) {
             subject,
             variables,
             status: 'sent',
+            events: [], // Initialize empty events array for tracking
             metadata: {
                 messageId: sendResult.MessageId,
                 // Get IP and user agent from request

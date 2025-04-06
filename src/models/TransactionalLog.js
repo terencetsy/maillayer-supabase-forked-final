@@ -1,3 +1,5 @@
+// Update src/models/TransactionalLog.js to add events field
+
 import mongoose from 'mongoose';
 
 const TransactionalLogSchema = new mongoose.Schema({
@@ -43,6 +45,24 @@ const TransactionalLogSchema = new mongoose.Schema({
     userAgent: {
         type: String,
     },
+    // Add this events array to track transactional email events
+    events: [
+        {
+            type: {
+                type: String,
+                enum: ['open', 'click', 'bounce', 'complaint'],
+                required: true,
+            },
+            timestamp: {
+                type: Date,
+                default: Date.now,
+            },
+            metadata: {
+                type: mongoose.Schema.Types.Mixed,
+                default: {},
+            },
+        },
+    ],
     metadata: {
         type: mongoose.Schema.Types.Mixed,
         default: {},
@@ -60,6 +80,7 @@ const TransactionalLogSchema = new mongoose.Schema({
 // Index for faster queries
 TransactionalLogSchema.index({ templateId: 1, createdAt: -1 });
 TransactionalLogSchema.index({ brandId: 1, createdAt: -1 });
+TransactionalLogSchema.index({ to: 1 }); // Add index for recipient email queries
 
 const TransactionalLog = mongoose.models.TransactionalLog || mongoose.model('TransactionalLog', TransactionalLogSchema);
 export default TransactionalLog;

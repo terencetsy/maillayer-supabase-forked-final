@@ -187,32 +187,72 @@ export async function parseTemplateVariables(content) {
     return variables;
 }
 
+// Enhanced trackTransactionalEvent function for src/services/transactionalService.js
+
 export async function trackTransactionalEvent(templateId, eventType, metadata = {}) {
     await connectToDatabase();
 
-    // Update template stats based on event type
-    let updateField = '';
-    switch (eventType) {
-        case 'open':
-            updateField = 'stats.opens';
-            break;
-        case 'click':
-            updateField = 'stats.clicks';
-            break;
-        case 'bounce':
-            updateField = 'stats.bounces';
-            break;
-        case 'complaint':
-            updateField = 'stats.complaints';
-            break;
-        default:
-            return false;
-    }
+    try {
+        console.log(`Tracking transactional event: ${eventType} for template ${templateId}`, metadata);
 
-    if (updateField) {
-        await TransactionalTemplate.updateOne({ _id: templateId }, { $inc: { [updateField]: 1 } });
-        return true;
-    }
+        // Update template stats based on event type
+        let updateField = '';
+        switch (eventType) {
+            case 'open':
+                updateField = 'stats.opens';
+                break;
+            case 'click':
+                updateField = 'stats.clicks';
+                break;
+            case 'bounce':
+                updateField = 'stats.bounces';
+                break;
+            case 'complaint':
+                updateField = 'stats.complaints';
+                break;
+            default:
+                console.warn(`Unknown event type: ${eventType}`);
+                return false;
+        }
 
-    return false;
+        if (updateField) {
+            // Make sure templateId is valid before updating
+            if (!mongoose.Types.ObjectId.isValid(templateId)) {
+                console.error(`Invalid templateId: ${templateId}`);
+                return false;
+            }
+
+            const result = await TransactionalTemplate.updateOne({ _id: new mongoose.Types.ObjectId(templateId) }, { $inc: { [updateField]: 1 } });
+
+            console.log(`Updated ${updateField} for template ${templateId}:`, result);
+
+            // Also update TransactionalLog if email is provided
+            if (metadata.email) {
+                const logResult = await TransactionalLog.findOneAndUpdate(
+                    {
+                        templateId: new mongoose.Types.ObjectId(templateId),
+                        to: metadata.email,
+                    },
+                    {
+                        $push: {
+                            events: {
+                                type: eventType,
+                                timestamp: new Date(),
+                                metadata,
+                            },
+                        },
+                    }
+                );
+
+                console.log(`Updated log entry for ${metadata.email}:`, logResult ? 'Success' : 'Not found');
+            }
+
+            return true;
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error tracking transactional event:', error);
+        return false;
+    }
 }

@@ -1,6 +1,9 @@
+// src/pages/api/tracking/transactional.js
 import { trackTransactionalEvent } from '@/services/transactionalService';
 import { verifyTrackingToken } from '@/services/trackingService';
 import { getGeoData } from '@/lib/geoip';
+import TransactionalLog from '@/models/TransactionalLog';
+import mongoose from 'mongoose';
 
 // Set Content-Type for tracking pixel
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
@@ -19,63 +22,91 @@ export default async function handler(req, res) {
         return res.status(405).json({ message: 'Method not allowed' });
     }
 
-    const { templateId, email, token } = req.query;
-
-    // Basic validation
-    if (!templateId || !email || !token) {
-        return res.status(400).json({ message: 'Missing required parameters' });
-    }
-
-    // Verify tracking token
-    if (!verifyTrackingToken(token, templateId, 'txn', email)) {
-        return res.status(403).json({ message: 'Invalid tracking token' });
-    }
+    // Always send the GIF immediately to ensure it loads even if validation fails
+    res.setHeader('Content-Type', 'image/gif');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(TRANSPARENT_GIF);
 
     try {
-        // Get the IP address
-        const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || req.socket.remoteAddress;
+        const { templateId, email, token } = req.query;
 
-        // Strip IPv6 prefix if present
-        const cleanIp = ipAddress?.replace(/^::ffff:/, '') || 'unknown';
+        // Debug info
+        console.log('Transactional tracking request received:', {
+            templateId,
+            email,
+            tokenLength: token?.length,
+            headers: req.headers,
+            url: req.url,
+        });
 
-        // Different handling based on tracking type
-        // For open events, we want to respond quickly with the pixel
-        // Return a transparent 1x1 GIF immediately
-        res.setHeader('Content-Type', 'image/gif');
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.send(TRANSPARENT_GIF);
+        // Basic validation
+        if (!templateId || !email || !token) {
+            console.warn('Missing required parameters for tracking:', { templateId, email, token });
+            return; // Already sent GIF, so just return
+        }
 
-        // Process the tracking in the background
-        // This won't block the response
+        // Verify tracking token
+        const isValidToken = verifyTrackingToken(token, templateId, 'txn', email);
+        if (!isValidToken) {
+            console.warn('Invalid tracking token:', {
+                providedToken: token,
+                templateId,
+                email,
+            });
+            return; // Already sent GIF, so just return
+        }
+
+        // Process the tracking in the background (non-blocking)
         setTimeout(async () => {
-            const geoData = await getGeoData(cleanIp);
-
             try {
+                // Get the IP address
+                const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || req.socket.remoteAddress;
+                const cleanIp = ipAddress?.replace(/^::ffff:/, '') || 'unknown';
+
+                // Get geo data if available
+                const geoData = await getGeoData(cleanIp);
+
+                // Log the open event in both ways
+
+                // 1. Using the trackTransactionalEvent function
                 await trackTransactionalEvent(templateId, 'open', {
                     email,
                     geolocation: geoData,
                     ipAddress: cleanIp,
                     userAgent: req.headers['user-agent'],
                 });
+
+                // 2. Update the TransactionalLog directly as a backup
+                const updateResult = await TransactionalLog.updateOne(
+                    {
+                        templateId: new mongoose.Types.ObjectId(templateId),
+                        to: email,
+                    },
+                    {
+                        $push: {
+                            events: {
+                                type: 'open',
+                                timestamp: new Date(),
+                                userAgent: req.headers['user-agent'],
+                                ipAddress: cleanIp,
+                                geolocation: geoData,
+                            },
+                        },
+                    }
+                );
+
+                console.log('Tracked transactional open:', {
+                    templateId,
+                    email,
+                    trackingResult: updateResult,
+                });
             } catch (err) {
                 console.error('Background tracking error:', err);
             }
         }, 0);
-
-        return;
     } catch (error) {
-        console.error(`Error tracking:`, error);
-
-        // For pixel tracking, we should still return the transparent GIF
-        // even if there's an error to avoid breaking email clients
-        res.setHeader('Content-Type', 'image/gif');
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        return res.send(TRANSPARENT_GIF);
-
-        return res.status(500).json({ message: 'Error tracking event' });
+        console.error('Error in transactional tracking:', error);
     }
 }
