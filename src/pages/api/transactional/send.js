@@ -94,16 +94,8 @@ export default async function handler(req, res) {
             to
         );
 
-        // Add tracking pixel and convert links for click tracking
-        const trackingPixel = `<img src="${config.baseUrl}/api/tracking/open?cid=${template._id}&lid=txn&e=${encodeURIComponent(to)}&t=${trackingToken}" width="1" height="1" alt="" style="display:none;" />`;
+        const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${trackingToken}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
         content = content + trackingPixel;
-
-        // Process links for click tracking
-        const linkRegex = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"([^>]*)>(.*?)<\/a>/gi;
-        content = content.replace(linkRegex, (match, url, attrs, text) => {
-            const trackingUrl = `${config.baseUrl}/api/tracking/click?cid=${template._id}&lid=txn&e=${encodeURIComponent(to)}&t=${trackingToken}&url=${encodeURIComponent(url)}`;
-            return `<a href="${trackingUrl}"${attrs}>${text}</a>`;
-        });
 
         // Initialize SES client
         const ses = new AWS.SES({
