@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
 
 const APIDocsSection = ({ template, brand }) => {
+    console.log('APIDocsSection', template, brand);
     const [copiedSection, setCopiedSection] = useState(null);
     const [activeTab, setActiveTab] = useState('curl');
 
@@ -23,7 +24,7 @@ const APIDocsSection = ({ template, brand }) => {
     "apiKey": "${template.apiKey}",
     "to": "recipient@example.com",
     "variables": {
-      ${template.variables?.map((v) => `"${v}": "Example Value"`).join(',\n      ') || '"example": "value"'}
+      ${template.variables?.map((v) => `"${v.name}": "Example Value"`).join(',\n      ') || '"example": "value"'}
     }
   }'`;
 
@@ -36,7 +37,7 @@ const APIDocsSection = ({ template, brand }) => {
     apiKey: "${template.apiKey}",
     to: "recipient@example.com",
     variables: {
-      ${template.variables?.map((v) => `${v}: "Example Value"`).join(',\n      ') || 'example: "value"'}
+      ${template.variables?.map((v) => `${v.name}: "Example Value"`).join(',\n      ') || 'example: "value"'}
     }
   })
 });
@@ -52,7 +53,7 @@ response = requests.post(
         "apiKey": "${template.apiKey}",
         "to": "recipient@example.com",
         "variables": {
-            ${template.variables?.map((v) => `"${v}": "Example Value"`).join(',\n            ') || '"example": "value"'}
+            ${template.variables?.map((v) => `"${v.name}": "Example Value"`).join(',\n            ') || '"example": "value"'}
         }
     }
 )
@@ -64,7 +65,7 @@ $data = [
     'apiKey' => '${template.apiKey}',
     'to' => 'recipient@example.com',
     'variables' => [
-        ${template.variables?.map((v) => `'${v}' => 'Example Value'`).join(',\n        ') || "'example' => 'value'"}
+        ${template.variables?.map((v) => `'${v.name}' => 'Example Value'`).join(',\n        ') || "'example' => 'value'"}
     ]
 ];
 
@@ -137,7 +138,7 @@ print_r($result);
                                                     key={i}
                                                     className="var-name"
                                                 >
-                                                    {v}
+                                                    {v.name}
                                                 </span>
                                             ))}
                                         </div>

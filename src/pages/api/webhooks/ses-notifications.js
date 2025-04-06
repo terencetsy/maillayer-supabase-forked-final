@@ -17,16 +17,12 @@ export default async function handler(req, res) {
         // Parse the SNS message
         const snsMessage = JSON.parse(req.body);
 
-        // Log basic information about the message
-        console.log('Received SNS message type:', snsMessage.Type);
-
         // Handle subscription confirmation
         if (snsMessage.Type === 'SubscriptionConfirmation') {
             const subscribeUrl = snsMessage.SubscribeURL;
             const response = await fetch(subscribeUrl);
 
             if (response.ok) {
-                console.log('SNS subscription confirmed');
                 return res.status(200).json({ message: 'Subscription confirmed' });
             } else {
                 console.error('Failed to confirm SNS subscription');
@@ -36,7 +32,6 @@ export default async function handler(req, res) {
 
         // Handle notification messages
         if (snsMessage.Type === 'Notification') {
-            console.log('Processing SNS notification, MessageId:', snsMessage.MessageId);
             let messageContent;
 
             try {
@@ -53,13 +48,6 @@ export default async function handler(req, res) {
                 return res.status(200).json({ message: 'Notification processed (no mail data)' });
             }
 
-            // Log the mail structure for debugging
-            console.log('Mail data structure:', {
-                messageId: mailData.messageId,
-                hasTags: !!mailData.tags,
-                tagCount: mailData.tags ? Object.keys(mailData.tags).length : 0,
-            });
-
             // Extract campaign ID and contact ID from message tags - AWS SDK v3 format
             let campaignId, contactId;
 
@@ -68,11 +56,9 @@ export default async function handler(req, res) {
                 // Format expected with SDK v3: {tags: {campaignId: ['abc123'], contactId: ['def456']}}
                 if (mailData.tags.campaignId && mailData.tags.campaignId.length > 0) {
                     campaignId = mailData.tags.campaignId[0];
-                    console.log('Found campaignId in tags:', campaignId);
                 }
                 if (mailData.tags.contactId && mailData.tags.contactId.length > 0) {
                     contactId = mailData.tags.contactId[0];
-                    console.log('Found contactId in tags:', contactId);
                 }
             }
 
@@ -83,7 +69,6 @@ export default async function handler(req, res) {
                     const campaignMatch = mailData.messageId.match(/campaign[-_]([a-f0-9]+)/i);
                     if (campaignMatch && campaignMatch[1]) {
                         campaignId = campaignMatch[1];
-                        console.log('Extracted campaignId from messageId:', campaignId);
                     }
                 }
 
@@ -95,7 +80,6 @@ export default async function handler(req, res) {
                         if (emailMatch && emailMatch.length >= 3) {
                             campaignId = emailMatch[1];
                             contactId = emailMatch[2];
-                            console.log('Extracted IDs from email pattern:', { campaignId, contactId });
                             break;
                         }
                     }
@@ -118,7 +102,6 @@ export default async function handler(req, res) {
                         const contact = await Contact.findOne({ email: email });
                         if (contact) {
                             contactId = contact._id.toString();
-                            console.log('Found contactId by email lookup:', contactId);
                         }
                     }
                 } catch (err) {
@@ -137,21 +120,12 @@ export default async function handler(req, res) {
                 return res.status(200).json({ message: 'Notification processed (missing IDs)' });
             }
             const notificationType = messageContent.eventType;
-            console.log(`Processing ${notificationType} notification for campaign ${campaignId}, contact ${contactId}`);
 
             if (notificationType === 'Bounce') {
                 const bounceInfo = messageContent.bounce;
                 const recipients = bounceInfo.bouncedRecipients;
                 const bounceType = bounceInfo.bounceType; // Permanent or Transient
                 const subType = bounceInfo.bounceSubType;
-
-                console.log('Bounce received:', {
-                    type: bounceType,
-                    subType,
-                    recipients: recipients.map((r) => r.emailAddress),
-                    campaignId,
-                    contactId,
-                });
 
                 // Only mark as unsubscribed for permanent bounces
                 const isPermanent = bounceType === 'Permanent';
@@ -195,12 +169,6 @@ export default async function handler(req, res) {
                 const complaintInfo = messageContent.complaint;
                 const recipients = complaintInfo.complainedRecipients;
 
-                console.log('Complaint received:', {
-                    recipients: recipients.map((r) => r.emailAddress),
-                    campaignId,
-                    contactId,
-                });
-
                 // Update contact directly using the contactId from tags
                 await Contact.findByIdAndUpdate(contactId, {
                     status: 'complained',
@@ -234,12 +202,6 @@ export default async function handler(req, res) {
                 await Campaign.findByIdAndUpdate(campaignId, { $inc: { 'stats.complaints': 1 } });
             } else if (notificationType === 'Delivery') {
                 const deliveryInfo = messageContent.delivery;
-
-                console.log('Delivery success:', {
-                    email: mailData.destination[0],
-                    campaignId,
-                    contactId,
-                });
 
                 // Record the delivery event
                 const TrackingModel = createTrackingModel(campaignId);

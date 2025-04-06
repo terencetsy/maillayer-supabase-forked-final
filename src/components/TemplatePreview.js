@@ -14,8 +14,8 @@ const TemplatePreview = ({ template }) => {
         // If there are variables, replace them with test values or placeholders
         if (template.variables && template.variables.length > 0) {
             template.variables.forEach((variable) => {
-                const regex = new RegExp(`\\[${variable}\\]`, 'g');
-                const value = testValues[variable] || `[${variable}]`;
+                const regex = new RegExp(`\\[${variable.name}\\]`, 'g');
+                const value = testValues[variable.name] || `[${variable.name}]`;
                 content = content.replace(regex, value);
             });
         }
@@ -48,13 +48,13 @@ const TemplatePreview = ({ template }) => {
                                     key={index}
                                     className="variable-input"
                                 >
-                                    <label htmlFor={`var-${variable}`}>{variable}</label>
+                                    <label htmlFor={`var-${variable.name}`}>{variable.name}</label>
                                     <input
-                                        id={`var-${variable}`}
+                                        id={`var-${variable.name}`}
                                         type="text"
-                                        placeholder={`Value for ${variable}`}
-                                        value={testValues[variable] || ''}
-                                        onChange={(e) => handleInputChange(variable, e.target.value)}
+                                        placeholder={`Value for ${variable.name}`}
+                                        value={testValues[variable.name] || ''}
+                                        onChange={(e) => handleInputChange(variable.name, e.target.value)}
                                     />
                                 </div>
                             ))}

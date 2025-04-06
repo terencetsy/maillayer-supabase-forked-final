@@ -278,7 +278,7 @@ export default function TransactionalTemplateDetail() {
                                                             key={index}
                                                             className="variable-tag"
                                                         >
-                                                            {variable}
+                                                            {variable.name}
                                                         </span>
                                                     ))
                                                 ) : (
