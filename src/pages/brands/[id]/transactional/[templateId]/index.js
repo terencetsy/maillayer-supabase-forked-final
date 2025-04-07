@@ -544,7 +544,7 @@ export default function TransactionalTemplateDetail() {
                 </div>
 
                 {/* Daily Activity Chart */}
-                <div className="detail-section daily-activity-section">
+                {/* <div className="detail-section daily-activity-section">
                     <div className="section-header">
                         <h2>
                             <BarChart2 size={18} />
@@ -605,7 +605,7 @@ export default function TransactionalTemplateDetail() {
                             </div>
                         )}
                     </div>
-                </div>
+                </div> */}
 
                 {/* Latest Transactional Logs */}
                 <div className="detail-section transaction-logs-section">
