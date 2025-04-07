@@ -42,15 +42,17 @@ export default async function handler(req, res) {
         const resetUrl = `${config.baseUrl}/reset-password?token=${resetToken}`;
 
         // Call your custom email API
-        const emailResponse = await fetch(`${config.baseUrl}/api/send-password-email`, {
+        const emailResponse = await fetch(`https://api.maillayer.com/v1/transactional/76YyfHiWVBUwG4qR`, {
             method: 'POST',
             headers: {
+                Authorization: 'Bearer gdqtrk093a0143drb7is5rdcy2xw7552',
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 email: user.email,
-                resetUrl,
-                name: user.name,
+                dataVariables: {
+                    resetUrl,
+                },
             }),
         });
 
