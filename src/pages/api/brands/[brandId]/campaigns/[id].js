@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         // PUT request - update a campaign
         if (req.method === 'PUT') {
             try {
-                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt, contactListIds } = req.body;
+                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt, contactListIds, warmupConfig } = req.body;
 
                 const campaign = await getCampaignById(id, userId);
 
