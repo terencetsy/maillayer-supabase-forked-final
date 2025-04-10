@@ -118,7 +118,7 @@ function defineModels() {
             },
             status: {
                 type: String,
-                enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed', 'paused'],
+                enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed', 'paused', 'warmup'],
                 default: 'draft',
             },
             contactListIds: [
@@ -129,7 +129,7 @@ function defineModels() {
             ],
             scheduleType: {
                 type: String,
-                enum: ['send_now', 'schedule'],
+                enum: ['send_now', 'schedule', 'warmup'],
                 default: 'send_now',
             },
             scheduledAt: {
@@ -170,6 +170,20 @@ function defineModels() {
                 hasMoreToProcess: { type: Boolean, default: true },
                 processingStartedAt: Date,
                 processedBatches: { type: Number, default: 0 },
+            },
+            warmupConfig: {
+                type: {
+                    initialBatchSize: { type: Number, default: 50 },
+                    incrementFactor: { type: Number, default: 2 },
+                    incrementInterval: { type: Number, default: 24 }, // in hours
+                    maxBatchSize: { type: Number, default: 10000 },
+                    warmupStartDate: { type: Date },
+                    currentWarmupStage: { type: Number, default: 0 },
+                    totalStages: { type: Number },
+                    completedBatches: { type: Number, default: 0 },
+                    lastBatchSentAt: { type: Date },
+                },
+                default: null,
             },
         },
         {
@@ -731,7 +745,7 @@ async function initializeQueues() {
 
             // Calculate next batch
             const updatedCampaign = await Campaign.findById(campaignId);
-
+            console.log(`Updated campaign stats:`, updatedCampaign);
             // Check if we have more contacts to process
             const remainingContacts = updatedCampaign.stats.recipients - updatedCampaign.stats.processed;
 
