@@ -41,7 +41,7 @@ const CampaignSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed'],
+        enum: ['draft', 'queued', 'scheduled', 'sending', 'sent', 'failed', 'warmup'],
         default: 'draft',
     },
     contactListIds: [
@@ -52,7 +52,7 @@ const CampaignSchema = new mongoose.Schema({
     ],
     scheduleType: {
         type: String,
-        enum: ['send_now', 'schedule'],
+        enum: ['send_now', 'schedule', 'warmup'],
         default: 'send_now',
     },
     scheduledAt: {
@@ -90,6 +90,20 @@ const CampaignSchema = new mongoose.Schema({
             type: Number,
             default: 0,
         },
+    },
+    warmupConfig: {
+        type: {
+            initialBatchSize: { type: Number, default: 50 },
+            incrementFactor: { type: Number, default: 2 },
+            incrementInterval: { type: Number, default: 24 }, // in hours
+            maxBatchSize: { type: Number, default: 10000 },
+            warmupStartDate: { type: Date },
+            currentWarmupStage: { type: Number, default: 0 },
+            totalStages: { type: Number },
+            completedBatches: { type: Number, default: 0 },
+            lastBatchSentAt: { type: Date },
+        },
+        default: null,
     },
     createdAt: {
         type: Date,

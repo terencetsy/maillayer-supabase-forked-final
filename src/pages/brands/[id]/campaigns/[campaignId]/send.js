@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { ArrowLeft, Send, Calendar, Clock, CheckCircle, Users, Mail, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, Clock, CheckCircle, Users, Mail, AlertCircle, X, Info, Droplet } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -25,6 +25,7 @@ export default function SendCampaign() {
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     // Send parameters
     const [selectedLists, setSelectedLists] = useState([]);
@@ -33,6 +34,16 @@ export default function SendCampaign() {
     const [scheduledTime, setScheduledTime] = useState(new Date());
     const [totalContacts, setTotalContacts] = useState(0);
     const [activeContactCounts, setActiveContactCounts] = useState({});
+
+    // Warmup parameters
+    const [initialBatchSize, setInitialBatchSize] = useState(50);
+    const [incrementFactor, setIncrementFactor] = useState(2);
+    const [incrementInterval, setIncrementInterval] = useState(24);
+    const [maxBatchSize, setMaxBatchSize] = useState(10000);
+    const [warmupStartDate, setWarmupStartDate] = useState(new Date());
+    const [warmupStartTime, setWarmupStartTime] = useState(new Date());
+    const [estimatedWarmupDuration, setEstimatedWarmupDuration] = useState(null);
+    const [warmupStages, setWarmupStages] = useState([]);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -85,6 +96,88 @@ export default function SendCampaign() {
 
         fetchActiveContactCounts();
     }, [selectedLists, id, activeContactCounts]);
+
+    // Calculate warmup stages and duration when warmup parameters change
+    useEffect(() => {
+        if (scheduleType === 'warmup' && totalContacts > 0) {
+            calculateWarmupSchedule();
+        }
+    }, [scheduleType, initialBatchSize, incrementFactor, incrementInterval, maxBatchSize, totalContacts]);
+
+    const calculateWarmupSchedule = () => {
+        if (totalContacts <= 0) return;
+
+        const stages = [];
+        let currentBatchSize = initialBatchSize;
+        let totalSent = 0;
+        let stageCount = 0;
+        let cumulativeDays = 0;
+        const intervalInDays = incrementInterval / 24;
+
+        while (totalSent < totalContacts) {
+            // Make sure we don't exceed total contacts in the final batch
+            const stageBatchSize = Math.min(currentBatchSize, totalContacts - totalSent);
+
+            stages.push({
+                stage: stageCount,
+                batchSize: stageBatchSize,
+                totalSent: totalSent + stageBatchSize,
+                day: cumulativeDays,
+                date: new Date(warmupStartDate.getTime() + cumulativeDays * 24 * 60 * 60 * 1000),
+            });
+
+            totalSent += stageBatchSize;
+            stageCount++;
+            cumulativeDays += intervalInDays;
+
+            // Calculate next batch size according to warmup formula
+            currentBatchSize = Math.min(Math.floor(initialBatchSize * Math.pow(incrementFactor, stageCount)), maxBatchSize);
+
+            // If we're already at max batch size and still have more to send,
+            // we can predict how many more batches at max size
+            if (currentBatchSize === maxBatchSize && totalSent < totalContacts) {
+                const remainingContacts = totalContacts - totalSent;
+                const fullBatchesRemaining = Math.floor(remainingContacts / maxBatchSize);
+
+                // Add full batches
+                for (let i = 0; i < fullBatchesRemaining; i++) {
+                    totalSent += maxBatchSize;
+                    stageCount++;
+                    cumulativeDays += intervalInDays;
+
+                    stages.push({
+                        stage: stageCount,
+                        batchSize: maxBatchSize,
+                        totalSent: totalSent,
+                        day: cumulativeDays,
+                        date: new Date(warmupStartDate.getTime() + cumulativeDays * 24 * 60 * 60 * 1000),
+                    });
+                }
+
+                // Add final partial batch if needed
+                const finalBatchSize = remainingContacts % maxBatchSize;
+                if (finalBatchSize > 0) {
+                    stageCount++;
+                    cumulativeDays += intervalInDays;
+                    totalSent += finalBatchSize;
+
+                    stages.push({
+                        stage: stageCount,
+                        batchSize: finalBatchSize,
+                        totalSent: totalSent,
+                        day: cumulativeDays,
+                        date: new Date(warmupStartDate.getTime() + cumulativeDays * 24 * 60 * 60 * 1000),
+                    });
+                }
+
+                // Break since we've calculated all stages
+                break;
+            }
+        }
+
+        setWarmupStages(stages);
+        setEstimatedWarmupDuration(cumulativeDays);
+    };
 
     const fetchBrandDetails = async () => {
         try {
@@ -196,7 +289,8 @@ export default function SendCampaign() {
         }
     };
 
-    const handleSendCampaign = async () => {
+    const handleSendButtonClick = () => {
+        // First validate the form
         if (selectedLists.length === 0) {
             setError('Please select at least one contact list');
             return;
@@ -207,12 +301,22 @@ export default function SendCampaign() {
             return;
         }
 
+        if (scheduleType === 'warmup' && !isValidWarmupConfig()) {
+            return;
+        }
+
         // Check if there are active contacts
         if (totalContacts === 0) {
             setError('Selected lists have no active contacts to send to');
             return;
         }
 
+        // Show confirmation modal
+        setShowConfirmModal(true);
+    };
+
+    const handleSendCampaign = async () => {
+        setShowConfirmModal(false);
         setIsSending(true);
         setError('');
         setSuccess('');
@@ -228,6 +332,23 @@ export default function SendCampaign() {
                 scheduledAt = combinedDate.toISOString();
             }
 
+            // Prepare warmup config if needed
+            let warmupConfig = null;
+            if (scheduleType === 'warmup') {
+                // Combine date and time for warmup start
+                const warmupStartDateTime = new Date(warmupStartDate);
+                warmupStartDateTime.setHours(warmupStartTime.getHours());
+                warmupStartDateTime.setMinutes(warmupStartTime.getMinutes());
+
+                warmupConfig = {
+                    initialBatchSize,
+                    incrementFactor,
+                    incrementInterval,
+                    maxBatchSize,
+                    warmupStartDate: warmupStartDateTime.toISOString(),
+                };
+            }
+
             const res = await fetch(`/api/brands/${id}/campaigns/${campaignId}`, {
                 method: 'PUT',
                 headers: {
@@ -235,9 +356,10 @@ export default function SendCampaign() {
                 },
                 body: JSON.stringify({
                     // Include all necessary campaign data
-                    status: scheduleType === 'schedule' ? 'scheduled' : 'sending',
+                    status: scheduleType === 'schedule' ? 'scheduled' : scheduleType === 'warmup' ? null : 'sending',
                     scheduleType,
                     scheduledAt,
+                    warmupConfig,
                     contactListIds: selectedLists,
                     fromName: brand.fromName,
                     fromEmail: brand.fromEmail,
@@ -248,10 +370,12 @@ export default function SendCampaign() {
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.message || 'Failed to send campaign');
+                throw new Error(data.message || 'Failed to update campaign');
             }
 
-            setSuccess(scheduleType === 'send_now' ? 'Campaign is being sent!' : 'Campaign has been scheduled!');
+            const successMessage = scheduleType === 'send_now' ? 'Campaign is being sent!' : scheduleType === 'schedule' ? 'Campaign has been scheduled!' : 'Campaign warmup has been started!';
+
+            setSuccess(successMessage);
 
             // Redirect back to campaign after short delay
             setTimeout(() => {
@@ -275,8 +399,57 @@ export default function SendCampaign() {
         return combinedDate > new Date();
     };
 
+    const isValidWarmupConfig = () => {
+        let isValid = true;
+
+        if (initialBatchSize <= 0) {
+            setError('Initial batch size must be greater than 0');
+            isValid = false;
+        }
+
+        if (incrementFactor <= 1) {
+            setError('Increment factor must be greater than 1');
+            isValid = false;
+        }
+
+        if (incrementInterval <= 0) {
+            setError('Increment interval must be greater than 0');
+            isValid = false;
+        }
+
+        if (maxBatchSize <= initialBatchSize) {
+            setError('Maximum batch size must be greater than initial batch size');
+            isValid = false;
+        }
+
+        const warmupDateTime = new Date(warmupStartDate);
+        warmupDateTime.setHours(warmupStartTime.getHours());
+        warmupDateTime.setMinutes(warmupStartTime.getMinutes());
+
+        if (warmupDateTime <= new Date()) {
+            setError('Warmup start time must be in the future');
+            isValid = false;
+        }
+
+        return isValid;
+    };
+
     const isBrandReadyToSend = () => {
         return !(brand.status === 'pending_setup' || brand.status === 'pending_verification');
+    };
+
+    // Format number for display in confirmation modal
+    const formatNumber = (num) => {
+        return new Intl.NumberFormat().format(num);
+    };
+
+    // Format date for display
+    const formatDate = (date) => {
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        });
     };
 
     if (isLoading || !brand || !campaign) {
@@ -427,6 +600,7 @@ export default function SendCampaign() {
                     </div>
                     <div className="sc-card-content">
                         <div className="sc-schedule-options">
+                            {/* Send Now Option */}
                             <div
                                 className={`sc-option ${scheduleType === 'send_now' ? 'sc-selected' : ''}`}
                                 onClick={() => setScheduleType('send_now')}
@@ -448,6 +622,7 @@ export default function SendCampaign() {
                                 </div>
                             </div>
 
+                            {/* Schedule for Later Option */}
                             <div
                                 className={`sc-option ${scheduleType === 'schedule' ? 'sc-selected' : ''}`}
                                 onClick={() => setScheduleType('schedule')}
@@ -468,8 +643,31 @@ export default function SendCampaign() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Domain Warmup Option - New */}
+                            <div
+                                className={`sc-option ${scheduleType === 'warmup' ? 'sc-selected' : ''}`}
+                                onClick={() => setScheduleType('warmup')}
+                            >
+                                <div className="sc-radio">
+                                    <input
+                                        type="radio"
+                                        checked={scheduleType === 'warmup'}
+                                        onChange={() => {}}
+                                        id="warmup"
+                                    />
+                                </div>
+                                <div className="sc-option-content">
+                                    <Droplet size={18} />
+                                    <div className="sc-option-info">
+                                        <h4>Domain Warmup</h4>
+                                        <p>Gradually send over time to warm up your domain reputation</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
+                        {/* Schedule Options */}
                         {scheduleType === 'schedule' && (
                             <div className="date-time-selection">
                                 <div className="date-picker-wrapper">
@@ -496,6 +694,161 @@ export default function SendCampaign() {
                                 </div>
                             </div>
                         )}
+
+                        {/* Warmup Options - New */}
+                        {scheduleType === 'warmup' && (
+                            <div className="sc-warmup-options">
+                                <div className="sc-warmup-info">
+                                    <div className="sc-info-box">
+                                        <Info size={16} />
+                                        <span>Domain warmup helps establish sender reputation by gradually increasing email volume over time. This improves deliverability and reduces the chance of being marked as spam.</span>
+                                    </div>
+                                </div>
+
+                                <div className="sc-warmup-config">
+                                    <h4>Warmup Configuration</h4>
+
+                                    <div className="sc-warmup-form">
+                                        <div className="sc-form-row">
+                                            <div className="sc-form-group">
+                                                <label htmlFor="initialBatchSize">Initial Batch Size</label>
+                                                <input
+                                                    id="initialBatchSize"
+                                                    type="number"
+                                                    value={initialBatchSize}
+                                                    onChange={(e) => setInitialBatchSize(Math.max(1, parseInt(e.target.value)))}
+                                                    min="1"
+                                                    className="sc-form-input"
+                                                />
+                                                <div className="sc-form-help">Number of emails in the first batch</div>
+                                            </div>
+
+                                            <div className="sc-form-group">
+                                                <label htmlFor="incrementFactor">Growth Factor</label>
+                                                <input
+                                                    id="incrementFactor"
+                                                    type="number"
+                                                    value={incrementFactor}
+                                                    onChange={(e) => setIncrementFactor(Math.max(1.1, parseFloat(e.target.value)))}
+                                                    step="0.1"
+                                                    min="1.1"
+                                                    className="sc-form-input"
+                                                />
+                                                <div className="sc-form-help">Multiply batch size by this factor each step (e.g., 2 = double)</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="sc-form-row">
+                                            <div className="sc-form-group">
+                                                <label htmlFor="incrementInterval">Interval (hours)</label>
+                                                <input
+                                                    id="incrementInterval"
+                                                    type="number"
+                                                    value={incrementInterval}
+                                                    onChange={(e) => setIncrementInterval(Math.max(1, parseInt(e.target.value)))}
+                                                    min="1"
+                                                    className="sc-form-input"
+                                                />
+                                                <div className="sc-form-help">Hours between each batch (24 = daily)</div>
+                                            </div>
+
+                                            <div className="sc-form-group">
+                                                <label htmlFor="maxBatchSize">Maximum Batch Size</label>
+                                                <input
+                                                    id="maxBatchSize"
+                                                    type="number"
+                                                    value={maxBatchSize}
+                                                    onChange={(e) => setMaxBatchSize(Math.max(initialBatchSize, parseInt(e.target.value)))}
+                                                    min={initialBatchSize}
+                                                    className="sc-form-input"
+                                                />
+                                                <div className="sc-form-help">Maximum emails per batch</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="date-time-selection">
+                                            <div className="date-picker-wrapper">
+                                                <label>Start Date</label>
+                                                <DatePicker
+                                                    selected={warmupStartDate}
+                                                    onChange={(date) => setWarmupStartDate(date)}
+                                                    minDate={new Date()}
+                                                    className="date-picker"
+                                                />
+                                            </div>
+                                            <div className="time-picker-wrapper">
+                                                <label>Start Time</label>
+                                                <DatePicker
+                                                    selected={warmupStartTime}
+                                                    onChange={(time) => setWarmupStartTime(time)}
+                                                    showTimeSelect
+                                                    showTimeSelectOnly
+                                                    timeIntervals={15}
+                                                    timeCaption="Time"
+                                                    dateFormat="h:mm aa"
+                                                    className="time-picker"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {warmupStages.length > 0 && (
+                                    <div className="sc-warmup-schedule">
+                                        <h4>Estimated Warmup Schedule</h4>
+
+                                        <div className="sc-warmup-summary">
+                                            <div className="sc-warmup-stat">
+                                                <span className="sc-stat-label">Total Contacts</span>
+                                                <span className="sc-stat-value">{formatNumber(totalContacts)}</span>
+                                            </div>
+                                            <div className="sc-warmup-stat">
+                                                <span className="sc-stat-label">Estimated Duration</span>
+                                                <span className="sc-stat-value">{estimatedWarmupDuration} days</span>
+                                            </div>
+                                            <div className="sc-warmup-stat">
+                                                <span className="sc-stat-label">Total Batches</span>
+                                                <span className="sc-stat-value">{warmupStages.length}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="sc-warmup-stages-container">
+                                            <div className="sc-warmup-stages-header">
+                                                <div className="sc-stage-header">Stage</div>
+                                                <div className="sc-stage-header">Date</div>
+                                                <div className="sc-stage-header">Batch Size</div>
+                                                <div className="sc-stage-header">Total Sent</div>
+                                            </div>
+
+                                            <div className="sc-warmup-stages">
+                                                {warmupStages.slice(0, 5).map((stage) => (
+                                                    <div
+                                                        key={stage.stage}
+                                                        className="sc-warmup-stage"
+                                                    >
+                                                        <div className="sc-stage-cell">#{stage.stage + 1}</div>
+                                                        <div className="sc-stage-cell">{formatDate(stage.date)}</div>
+                                                        <div className="sc-stage-cell">{formatNumber(stage.batchSize)}</div>
+                                                        <div className="sc-stage-cell">{formatNumber(stage.totalSent)}</div>
+                                                    </div>
+                                                ))}
+
+                                                {warmupStages.length > 5 && <div className="sc-warmup-more">{warmupStages.length - 5} more stages...</div>}
+
+                                                {warmupStages.length > 5 && (
+                                                    <div className="sc-warmup-stage">
+                                                        <div className="sc-stage-cell">#{warmupStages[warmupStages.length - 1].stage + 1}</div>
+                                                        <div className="sc-stage-cell">{formatDate(warmupStages[warmupStages.length - 1].date)}</div>
+                                                        <div className="sc-stage-cell">{formatNumber(warmupStages[warmupStages.length - 1].batchSize)}</div>
+                                                        <div className="sc-stage-cell">{formatNumber(warmupStages[warmupStages.length - 1].totalSent)}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -516,7 +869,7 @@ export default function SendCampaign() {
 
                     <button
                         className="sc-btn sc-btn-send"
-                        onClick={handleSendCampaign}
+                        onClick={handleSendButtonClick}
                         disabled={isSending || selectedLists.length === 0 || totalContacts === 0 || !isBrandReadyToSend()}
                     >
                         {isSending ? (
@@ -526,13 +879,136 @@ export default function SendCampaign() {
                             </>
                         ) : (
                             <>
-                                <Send size={18} />
-                                <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : 'Schedule Campaign'}</span>
+                                {scheduleType === 'warmup' ? <Droplet size={18} /> : <Send size={18} />}
+                                <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : scheduleType === 'schedule' ? 'Schedule Campaign' : 'Start Domain Warmup'}</span>
                             </>
                         )}
                     </button>
                 </div>
             </div>
+
+            {/* Confirmation Modal */}
+            {showConfirmModal && (
+                <div className="sc-modal-overlay">
+                    <div className="sc-modal">
+                        <div className="sc-modal-header">
+                            <h3>{scheduleType === 'send_now' ? 'Confirm Campaign Send' : scheduleType === 'schedule' ? 'Confirm Campaign Schedule' : 'Confirm Domain Warmup'}</h3>
+                            <button
+                                className="sc-close-btn"
+                                onClick={() => setShowConfirmModal(false)}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="sc-modal-content">
+                            <div className="sc-confirmation-message">
+                                {scheduleType === 'warmup' ? (
+                                    <Droplet
+                                        size={40}
+                                        className="warmup-icon"
+                                    />
+                                ) : (
+                                    <Send
+                                        size={40}
+                                        className={scheduleType === 'send_now' ? 'send-icon' : 'schedule-icon'}
+                                    />
+                                )}
+
+                                <p>
+                                    {scheduleType === 'send_now'
+                                        ? `You are about to send "${campaign.name}" to ${formatNumber(totalContacts)} contacts. This action cannot be undone.`
+                                        : scheduleType === 'schedule'
+                                        ? `You are about to schedule "${campaign.name}" to be sent to ${formatNumber(totalContacts)} contacts.`
+                                        : `You are about to start a domain warmup for "${campaign.name}" that will gradually send to ${formatNumber(totalContacts)} contacts over approximately ${estimatedWarmupDuration} days.`}
+                                </p>
+
+                                <div className="sc-campaign-summary">
+                                    <div className="sc-summary-item">
+                                        <span className="sc-summary-label">Subject:</span>
+                                        <span className="sc-summary-value">{campaign.subject}</span>
+                                    </div>
+
+                                    {scheduleType === 'schedule' && (
+                                        <div className="sc-summary-item">
+                                            <span className="sc-summary-label">Scheduled for:</span>
+                                            <span className="sc-summary-value">
+                                                {scheduledDate.toLocaleDateString('en-US', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric',
+                                                })}{' '}
+                                                at{' '}
+                                                {scheduledTime.toLocaleTimeString('en-US', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {scheduleType === 'warmup' && (
+                                        <>
+                                            <div className="sc-summary-item">
+                                                <span className="sc-summary-label">Start date:</span>
+                                                <span className="sc-summary-value">
+                                                    {warmupStartDate.toLocaleDateString('en-US', {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric',
+                                                    })}{' '}
+                                                    at{' '}
+                                                    {warmupStartTime.toLocaleTimeString('en-US', {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    })}
+                                                </span>
+                                            </div>
+                                            <div className="sc-summary-item">
+                                                <span className="sc-summary-label">First batch:</span>
+                                                <span className="sc-summary-value">{formatNumber(initialBatchSize)} contacts</span>
+                                            </div>
+                                            <div className="sc-summary-item">
+                                                <span className="sc-summary-label">Frequency:</span>
+                                                <span className="sc-summary-value">Every {incrementInterval} hours</span>
+                                            </div>
+                                            <div className="sc-summary-item">
+                                                <span className="sc-summary-label">Growth rate:</span>
+                                                <span className="sc-summary-value">{incrementFactor}x per batch</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="sc-summary-item">
+                                        <span className="sc-summary-label">Recipients:</span>
+                                        <span className="sc-summary-value">{formatNumber(totalContacts)} contacts</span>
+                                    </div>
+                                </div>
+
+                                {scheduleType === 'warmup' && (
+                                    <div className="sc-warmup-notice">
+                                        <Info size={16} />
+                                        <span>Warmup sends can be paused or cancelled from the campaign details page if needed.</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="sc-modal-actions">
+                                <button
+                                    className="sc-btn sc-btn-secondary"
+                                    onClick={() => setShowConfirmModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="sc-btn sc-btn-confirm"
+                                    onClick={handleSendCampaign}
+                                >
+                                    {scheduleType === 'send_now' ? 'Send Now' : scheduleType === 'schedule' ? 'Schedule Campaign' : 'Start Warmup Process'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </BrandLayout>
     );
 }

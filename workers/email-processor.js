@@ -541,6 +541,277 @@ async function initializeQueues() {
         }
     });
 
+    // Add this processor in your workers/email-processor.js
+    schedulerQueue.process('process-warmup-batch', async (job) => {
+        try {
+            const { campaignId, brandId, userId, contactListIds, fromName, fromEmail, replyTo, subject, batchSize, warmupStage } = job.data;
+
+            console.log(`Processing warmup batch for campaign ${campaignId}, stage ${warmupStage}, batch size ${batchSize}`);
+
+            // Get models
+            const { Campaign, Brand, Contact } = getModels();
+
+            // Find the campaign
+            const campaign = await Campaign.findById(campaignId);
+            if (!campaign) {
+                throw new Error(`Campaign not found: ${campaignId}`);
+            }
+
+            // Skip if campaign is no longer in warmup status
+            if (campaign.status !== 'warmup') {
+                console.log(`Campaign ${campaignId} is no longer in warmup status. Skipping batch.`);
+                return { success: false, message: 'Campaign no longer in warmup status' };
+            }
+
+            // Get brand info
+            const brand = await Brand.findById(brandId);
+            if (!brand) {
+                throw new Error(`Brand not found: ${brandId}`);
+            }
+
+            job.progress(10);
+
+            // Get the offset (how many contacts we've already processed)
+            const offset = campaign.stats?.processed || 0;
+
+            // Get contacts for this batch
+            const contacts = await Contact.find({
+                listId: { $in: contactListIds },
+                brandId: brandId,
+                status: 'active',
+            })
+                .sort({ _id: 1 })
+                .skip(offset)
+                .limit(batchSize);
+
+            if (contacts.length === 0) {
+                // No more contacts to process - campaign is complete
+                await Campaign.updateOne(
+                    { _id: campaignId },
+                    {
+                        $set: {
+                            status: 'sent',
+                            sentAt: new Date(),
+                            'warmupConfig.lastBatchSentAt': new Date(),
+                        },
+                    }
+                );
+
+                console.log(`Warmup campaign ${campaignId} completed. All contacts processed.`);
+                return { success: true, message: 'Warmup campaign completed' };
+            }
+
+            job.progress(20);
+
+            // Create SES client
+            const sesClient = new SESClient({
+                region: brand.awsRegion || 'us-east-1',
+                credentials: {
+                    accessKeyId: brand.awsAccessKey,
+                    secretAccessKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
+                },
+            });
+
+            // Check SES quota
+            const quotaCommand = new GetSendQuotaCommand({});
+            const quotaResponse = await sesClient.send(quotaCommand);
+            const maxSendRate = quotaResponse.MaxSendRate || 10;
+
+            // Process this batch
+            console.log(`Sending ${contacts.length} emails for warmup batch ${warmupStage}`);
+
+            // Create rate limiter for this batch
+            const limiter = new RateLimiter({ tokensPerInterval: maxSendRate, interval: 'second' });
+
+            let successCount = 0;
+            let failureCount = 0;
+            const deliveryEvents = [];
+
+            // Process each contact in this batch
+            for (const contact of contacts) {
+                // Wait for rate limiter token
+                await limiter.removeTokens(1);
+
+                try {
+                    // Add tracking to HTML content
+                    const trackingDomain = config.trackingDomain;
+                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
+
+                    // Extract plain text
+                    const textContent = extractTextFromHtml(processedHtml);
+
+                    // Send email
+                    const result = await sesClient.send(
+                        new SendEmailCommand({
+                            Source: `${fromName} <${fromEmail}>`,
+                            Destination: {
+                                ToAddresses: [contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email],
+                            },
+                            Message: {
+                                Subject: {
+                                    Data: subject || campaign.subject,
+                                },
+                                Body: {
+                                    Html: {
+                                        Data: processedHtml,
+                                    },
+                                    Text: {
+                                        Data: textContent || 'Empty campaign content',
+                                    },
+                                },
+                            },
+                            ReplyToAddresses: [replyTo || fromEmail],
+                            ConfigurationSetName: brand.sesConfigurationSet,
+                            Tags: [
+                                {
+                                    Name: 'campaignId',
+                                    Value: campaignId.toString(),
+                                },
+                                {
+                                    Name: 'contactId',
+                                    Value: contact._id.toString(),
+                                },
+                                {
+                                    Name: 'warmupStage',
+                                    Value: warmupStage.toString(),
+                                },
+                            ],
+                        })
+                    );
+
+                    // Add delivery event
+                    deliveryEvents.push({
+                        contactId: contact._id,
+                        campaignId: campaignId,
+                        email: contact.email,
+                        eventType: 'delivery',
+                        metadata: {
+                            messageId: result.MessageId,
+                            warmupStage: warmupStage,
+                        },
+                    });
+
+                    successCount++;
+                } catch (error) {
+                    console.error(`Failed to send to ${contact.email}:`, error.message);
+                    failureCount++;
+                }
+            }
+
+            job.progress(70);
+
+            // Log delivery events
+            if (deliveryEvents.length > 0) {
+                try {
+                    const TrackingModel = createTrackingModel(campaignId);
+                    await TrackingModel.insertMany(deliveryEvents);
+                } catch (error) {
+                    console.error('Error saving delivery events:', error);
+                }
+            }
+
+            // Update campaign stats
+            await Campaign.updateOne(
+                { _id: campaignId },
+                {
+                    $inc: {
+                        'stats.processed': contacts.length,
+                        'stats.recipients': contacts.length,
+                        'stats.bounces': failureCount,
+                        'warmupConfig.completedBatches': 1,
+                    },
+                    $set: {
+                        'warmupConfig.currentWarmupStage': warmupStage + 1,
+                        'warmupConfig.lastBatchSentAt': new Date(),
+                    },
+                }
+            );
+
+            job.progress(90);
+
+            // Calculate next batch
+            const updatedCampaign = await Campaign.findById(campaignId);
+
+            // Check if we have more contacts to process
+            const remainingContacts = updatedCampaign.stats.recipients - updatedCampaign.stats.processed;
+
+            if (remainingContacts > 0) {
+                // Calculate next batch size
+                const { initialBatchSize, incrementFactor, incrementInterval, maxBatchSize, currentWarmupStage } = updatedCampaign.warmupConfig;
+
+                // Calculate next batch size based on the warmup formula
+                let nextBatchSize = initialBatchSize * Math.pow(incrementFactor, currentWarmupStage);
+                nextBatchSize = Math.min(nextBatchSize, maxBatchSize, remainingContacts);
+
+                // Calculate next batch delay (in milliseconds)
+                const nextBatchDelay = incrementInterval * 60 * 60 * 1000; // Convert hours to ms
+
+                // Schedule next batch
+                await schedulerQueue.add(
+                    'process-warmup-batch',
+                    {
+                        campaignId: campaignId.toString(),
+                        brandId: brandId.toString(),
+                        userId: userId,
+                        contactListIds,
+                        fromName,
+                        fromEmail,
+                        replyTo,
+                        subject,
+                        batchSize: nextBatchSize,
+                        warmupStage: currentWarmupStage,
+                    },
+                    {
+                        delay: nextBatchDelay,
+                        jobId: `warmup-campaign-${campaignId}-batch-${currentWarmupStage}-${Date.now()}`,
+                        attempts: 3,
+                        backoff: {
+                            type: 'exponential',
+                            delay: 5000,
+                        },
+                        removeOnComplete: false,
+                    }
+                );
+
+                console.log(`Scheduled next warmup batch ${currentWarmupStage} with size ${nextBatchSize} in ${incrementInterval} hours`);
+            } else {
+                // Campaign complete
+                await Campaign.updateOne({ _id: campaignId }, { $set: { status: 'sent', sentAt: new Date() } });
+
+                console.log(`Warmup campaign ${campaignId} completed. All contacts processed.`);
+            }
+
+            job.progress(100);
+
+            return {
+                success: true,
+                message: 'Warmup batch processed successfully',
+                batchStats: {
+                    processed: contacts.length,
+                    successful: successCount,
+                    failed: failureCount,
+                    stage: warmupStage,
+                },
+            };
+        } catch (error) {
+            console.error(`Error processing warmup batch:`, error);
+
+            // Update campaign status to failed
+            try {
+                const { Campaign } = getModels();
+                const campaign = await Campaign.findById(job.data.campaignId);
+                if (campaign) {
+                    campaign.status = 'failed';
+                    await campaign.save();
+                }
+            } catch (updateError) {
+                console.error('Error updating campaign status to failed:', updateError);
+            }
+
+            throw error;
+        }
+    });
+
     // Complete send-campaign handler with email tracking
     emailCampaignQueue.process('send-campaign', async (job) => {
         const { campaignId, brandId, userId, contactListIds, fromName, fromEmail, replyTo, subject } = job.data;
