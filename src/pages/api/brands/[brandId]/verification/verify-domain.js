@@ -169,6 +169,7 @@ export default async function handler(req, res) {
                 );
                 configSetExists = true;
             } catch (err) {
+                console.log('Full error object:', JSON.stringify(err, null, 2));
                 if (err.name !== 'ConfigurationSetDoesNotExist') {
                     // If it's any other error, just log it and continue
                     console.warn('Configuration set check error (non-fatal):', err.message);
