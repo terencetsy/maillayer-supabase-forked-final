@@ -11007,3 +11007,56 @@ h4 {
         min-width: 500px;
     }
 }
+
+/* Dark theme styles for batch import progress */
+
+.batch-import-progress {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #2e2e2e;
+    border-radius: 8px;
+    background-color: #111111;
+}
+
+.batch-import-progress h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.progress-container {
+    height: 8px;
+    background-color: #1a1a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #5d87ff; /* Using your app's primary blue color */
+    transition: width 0.3s ease;
+}
+
+.progress-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.stat-item {
+    margin-right: 20px;
+}
+
+.stat-label {
+    font-weight: 500;
+    margin-right: 5px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #ffffff;
+}

@@ -219,7 +219,7 @@ export default async function handler(req, res) {
                         }
                     });
                 } catch (error) {
-                    console.error('Error inserting contacts:', error);
+                    console.log('Error inserting contacts:', error);
                     throw error;
                 }
             }

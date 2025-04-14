@@ -10,6 +10,15 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef(null);
 
+    const [batchProgress, setBatchProgress] = useState(0);
+    const [batchStats, setBatchStats] = useState({
+        processed: 0,
+        imported: 0,
+        skipped: 0,
+        total: 0,
+    });
+    const [isBatchImporting, setIsBatchImporting] = useState(false);
+
     // Manual contact form
     const [manualContact, setManualContact] = useState({
         email: '',
@@ -204,33 +213,78 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
     const handleCsvImport = async () => {
         try {
             setIsLoading(true);
+            setIsBatchImporting(true);
             setError('');
 
-            const response = await fetch(`/api/brands/${brandId}/contact-lists/${listId}/contacts`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contacts: parsedContacts,
-                    skipDuplicates: true, // Make sure this is set to true
-                }),
-                credentials: 'same-origin',
+            const totalContacts = parsedContacts.length;
+            const batchSize = 1000; // Process 1000 contacts per batch to stay under the 1MB limit
+
+            // Initialize batch stats
+            setBatchStats({
+                processed: 0,
+                imported: 0,
+                skipped: 0,
+                total: totalContacts,
             });
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to import contacts');
+            // Process in batches
+            for (let i = 0; i < totalContacts; i += batchSize) {
+                const endIndex = Math.min(i + batchSize, totalContacts);
+                const currentBatch = parsedContacts.slice(i, endIndex);
+
+                try {
+                    const response = await fetch(`/api/brands/${brandId}/contact-lists/${listId}/contacts`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contacts: currentBatch,
+                            skipDuplicates: true,
+                        }),
+                        credentials: 'same-origin',
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `Failed to import batch ${Math.floor(i / batchSize) + 1}`);
+                    }
+
+                    const batchResult = await response.json();
+
+                    // Update progress stats
+                    setBatchStats((prev) => ({
+                        processed: endIndex,
+                        imported: prev.imported + batchResult.imported,
+                        skipped: prev.skipped + batchResult.skipped,
+                        total: totalContacts,
+                    }));
+
+                    // Calculate and update progress percentage
+                    const progressPercent = Math.round((endIndex / totalContacts) * 100);
+                    setBatchProgress(progressPercent);
+                } catch (error) {
+                    console.error(`Error importing batch (contacts ${i + 1}-${Math.min(i + batchSize, totalContacts)}):`, error);
+                    setError((prev) => (prev ? `${prev}; ${error.message}` : error.message));
+                    // Continue with next batch instead of stopping entirely
+                }
             }
 
-            const result = await response.json();
-            setImportResult(result);
-            setStep(4); // Success screen
+            // Compile final results
+            const finalResult = {
+                total: totalContacts,
+                imported: batchStats.imported,
+                skipped: batchStats.skipped,
+            };
+
+            setImportResult(finalResult);
+            setStep(4); // Move to success screen
         } catch (error) {
-            console.error('Error importing contacts:', error);
-            setError(error.message || 'An unexpected error occurred');
+            console.error('Error in import process:', error);
+            setError(error.message || 'An unexpected error occurred during the import process');
         } finally {
             setIsLoading(false);
+            setIsBatchImporting(false);
         }
     };
 
@@ -587,15 +641,15 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                             type="button"
                                             className="btn btn-primary"
                                             onClick={handleCsvImport}
-                                            disabled={isLoading}
+                                            disabled={isLoading || isBatchImporting}
                                         >
-                                            {isLoading ? (
+                                            {isLoading || isBatchImporting ? (
                                                 <>
                                                     <Loader
                                                         size={16}
                                                         className="spinner"
                                                     />
-                                                    Importing...
+                                                    {isBatchImporting ? `Importing... ${batchProgress}%` : 'Preparing...'}
                                                 </>
                                             ) : (
                                                 'Import Contacts'
@@ -604,6 +658,38 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                     </div>
                                 </div>
                             )}
+
+                            {step === 3 && isBatchImporting && (
+                                <div className="batch-import-progress">
+                                    <h4>Importing Contacts in Batches</h4>
+                                    <div className="progress-container">
+                                        <div
+                                            className="progress-bar"
+                                            style={{ width: `${batchProgress}%` }}
+                                            aria-valuenow={batchProgress}
+                                            aria-valuemin="0"
+                                            aria-valuemax="100"
+                                        ></div>
+                                    </div>
+                                    <div className="progress-stats">
+                                        <div className="stat-item">
+                                            <span className="stat-label">Processed:</span>
+                                            <span className="stat-value">
+                                                {batchStats.processed} of {batchStats.total}
+                                            </span>
+                                        </div>
+                                        <div className="stat-item">
+                                            <span className="stat-label">Imported:</span>
+                                            <span className="stat-value">{batchStats.imported}</span>
+                                        </div>
+                                        <div className="stat-item">
+                                            <span className="stat-label">Skipped:</span>
+                                            <span className="stat-value">{batchStats.skipped}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {step === 4 && importResult && (
                                 <div className="import-complete">
                                     <div className="success-icon">
