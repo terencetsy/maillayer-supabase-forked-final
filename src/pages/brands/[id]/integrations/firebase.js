@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { ArrowLeft, Upload, Save, Check, X, Trash, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, Upload, Save, Check, X, Trash, AlertTriangle, Info, RefreshCw, UserPlus, ToggleLeft, ToggleRight } from 'lucide-react';
 import { FirebaseOutline } from '@/lib/icons';
 
 export default function FirebaseIntegration() {
@@ -18,12 +18,25 @@ export default function FirebaseIntegration() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
+    // Contact lists for auto-sync
+    const [contactLists, setContactLists] = useState([]);
+    const [isLoadingLists, setIsLoadingLists] = useState(false);
+
     // Form state
     const [name, setName] = useState('Firebase Integration');
     const [serviceAccountJson, setServiceAccountJson] = useState('');
     const [uploadedFile, setUploadedFile] = useState(null);
     const [validationError, setValidationError] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Auto-sync configuration state
+    const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+    const [selectedListId, setSelectedListId] = useState('');
+    const [createNewList, setCreateNewList] = useState(false);
+    const [newListName, setNewListName] = useState('Firebase Auth Users');
+    const [isTestingSyncConnection, setIsTestingSyncConnection] = useState(false);
+    const [syncingStatus, setSyncingStatus] = useState(null);
+    const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -34,8 +47,20 @@ export default function FirebaseIntegration() {
         if (status === 'authenticated' && id) {
             fetchBrandDetails();
             fetchFirebaseIntegration();
+            fetchContactLists();
         }
     }, [status, id, router]);
+
+    useEffect(() => {
+        // Set auto-sync configuration from integration if available
+        if (integration && integration.config) {
+            setAutoSyncEnabled(integration.config.autoSyncEnabled || false);
+            setSelectedListId(integration.config.autoSyncListId || '');
+            setCreateNewList(integration.config.createNewList || false);
+            setNewListName(integration.config.newListName || 'Firebase Auth Users');
+            setLastSyncedAt(integration.config.lastSyncedAt || null);
+        }
+    }, [integration]);
 
     const fetchBrandDetails = async () => {
         try {
@@ -85,6 +110,26 @@ export default function FirebaseIntegration() {
         }
     };
 
+    const fetchContactLists = async () => {
+        try {
+            setIsLoadingLists(true);
+            const res = await fetch(`/api/brands/${id}/contact-lists`, {
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to fetch contact lists');
+            }
+
+            const data = await res.json();
+            setContactLists(data);
+        } catch (error) {
+            console.error('Error fetching contact lists:', error);
+        } finally {
+            setIsLoadingLists(false);
+        }
+    };
+
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -126,6 +171,21 @@ export default function FirebaseIntegration() {
                 return;
             }
 
+            // Validate auto-sync settings
+            if (autoSyncEnabled) {
+                if (!createNewList && !selectedListId) {
+                    setError('Please select a contact list for auto-sync or choose to create a new list');
+                    setIsSaving(false);
+                    return;
+                }
+
+                if (createNewList && !newListName.trim()) {
+                    setError('Please provide a name for the new contact list');
+                    setIsSaving(false);
+                    return;
+                }
+            }
+
             const res = await fetch(`/api/brands/${id}/integrations/firebase`, {
                 method: 'POST',
                 headers: {
@@ -134,6 +194,12 @@ export default function FirebaseIntegration() {
                 body: JSON.stringify({
                     name,
                     serviceAccountJson: serviceAccountJson || JSON.stringify(integration.config.serviceAccount),
+                    autoSyncConfig: {
+                        autoSyncEnabled,
+                        autoSyncListId: selectedListId,
+                        createNewList,
+                        newListName,
+                    },
                 }),
                 credentials: 'same-origin',
             });
@@ -187,12 +253,130 @@ export default function FirebaseIntegration() {
             setName('Firebase Integration');
             setServiceAccountJson('');
             setUploadedFile(null);
+            setAutoSyncEnabled(false);
+            setSelectedListId('');
+            setCreateNewList(false);
+            setNewListName('Firebase Auth Users');
         } catch (error) {
             console.error('Error deleting Firebase integration:', error);
             setError(error.message);
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const testSyncConnection = async () => {
+        if (!integration) return;
+
+        try {
+            setError('');
+            setSyncingStatus('testing');
+            setIsTestingSyncConnection(true);
+
+            const res = await fetch(`/api/brands/${id}/integrations/firebase/test-sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    integrationId: integration._id,
+                }),
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed to test Firebase connection');
+            }
+
+            const data = await res.json();
+            setSyncingStatus('success');
+            setSuccess(`Connection test successful! Found ${data.userCount} users in Firebase Auth.`);
+        } catch (error) {
+            console.error('Error testing Firebase connection:', error);
+            setError(error.message);
+            setSyncingStatus('error');
+        } finally {
+            setIsTestingSyncConnection(false);
+            // Reset status after 3 seconds
+            setTimeout(() => {
+                setSyncingStatus(null);
+            }, 3000);
+        }
+    };
+
+    const triggerManualSync = async () => {
+        if (!integration) return;
+
+        try {
+            setError('');
+            setSyncingStatus('syncing');
+            setIsSaving(true);
+
+            // Validate sync settings
+            if (!createNewList && !selectedListId) {
+                setError('Please select a contact list for sync or choose to create a new list');
+                setIsSaving(false);
+                setSyncingStatus(null);
+                return;
+            }
+
+            if (createNewList && !newListName.trim()) {
+                setError('Please provide a name for the new contact list');
+                setIsSaving(false);
+                setSyncingStatus(null);
+                return;
+            }
+
+            const res = await fetch(`/api/brands/${id}/integrations/firebase/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    integrationId: integration._id,
+                    listId: selectedListId,
+                    createNewList,
+                    newListName,
+                }),
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed to sync Firebase users');
+            }
+
+            const data = await res.json();
+
+            if (data.newList) {
+                // If a new list was created, update the local state and select it
+                setContactLists([...contactLists, data.newList]);
+                setSelectedListId(data.newList._id);
+                setCreateNewList(false);
+            }
+
+            setSuccess(`Successfully synced ${data.importedCount} users from Firebase Auth!`);
+            setLastSyncedAt(data.syncedAt);
+            setSyncingStatus('success');
+
+            // Refresh integration data to get updated last synced timestamp
+            fetchFirebaseIntegration();
+        } catch (error) {
+            console.error('Error syncing Firebase users:', error);
+            setError(error.message);
+            setSyncingStatus('error');
+        } finally {
+            setIsSaving(false);
+            // Reset status after 3 seconds
+            setTimeout(() => {
+                setSyncingStatus(null);
+            }, 3000);
+        }
+    };
+
+    const toggleAutoSync = () => {
+        setAutoSyncEnabled(!autoSyncEnabled);
     };
 
     if (isLoading && !brand) return null;
@@ -257,6 +441,12 @@ export default function FirebaseIntegration() {
                             <span>Connected on {new Date(integration.createdAt).toLocaleDateString()}</span>
                             <span>•</span>
                             <span>Last updated: {new Date(integration.updatedAt).toLocaleDateString()}</span>
+                            {lastSyncedAt && (
+                                <>
+                                    <span>•</span>
+                                    <span>Last synced: {new Date(lastSyncedAt).toLocaleString()}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
@@ -364,6 +554,152 @@ export default function FirebaseIntegration() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Auth Users Sync Section - only visible when integration exists */}
+                            {integration && (
+                                <div className="auth-sync-section">
+                                    <h3>Firebase Auth Users Sync</h3>
+                                    <p className="section-description">Import and automatically sync Firebase Authentication users to a contact list. This feature will sync user data such as email, display name, and phone number.</p>
+
+                                    <div className="test-connection-container">
+                                        <button
+                                            className="test-connection-button"
+                                            onClick={testSyncConnection}
+                                            disabled={isTestingSyncConnection || isSaving}
+                                        >
+                                            {isTestingSyncConnection ? (
+                                                <>
+                                                    <RefreshCw
+                                                        size={16}
+                                                        className="spinner"
+                                                    />
+                                                    <span>Testing connection...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className={`test-status-icon ${syncingStatus}`}>{syncingStatus === 'success' ? <Check size={16} /> : syncingStatus === 'error' ? <AlertTriangle size={16} /> : <RefreshCw size={16} />}</div>
+                                                    <span>Test Firebase Auth Connection</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    <div className="auto-sync-toggle">
+                                        <div className="toggle-label">
+                                            <h4>Auto-Sync Firebase Auth Users</h4>
+                                            <p>Automatically import new and updated Firebase Auth users every hour</p>
+                                        </div>
+                                        <button
+                                            className="toggle-button"
+                                            onClick={toggleAutoSync}
+                                            disabled={isSaving}
+                                        >
+                                            {autoSyncEnabled ? (
+                                                <ToggleRight
+                                                    size={24}
+                                                    className="toggle-icon active"
+                                                />
+                                            ) : (
+                                                <ToggleLeft
+                                                    size={24}
+                                                    className="toggle-icon"
+                                                />
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* List selection section - shown if auto-sync is enabled */}
+                                    {autoSyncEnabled && (
+                                        <div className="sync-config-section">
+                                            <div className="form-group">
+                                                <div className="radio-group">
+                                                    <label className="radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            checked={!createNewList}
+                                                            onChange={() => setCreateNewList(false)}
+                                                            disabled={isSaving}
+                                                        />
+                                                        <span>Use existing contact list</span>
+                                                    </label>
+                                                </div>
+
+                                                {!createNewList && (
+                                                    <div className="contact-list-select">
+                                                        <select
+                                                            value={selectedListId}
+                                                            onChange={(e) => setSelectedListId(e.target.value)}
+                                                            disabled={isSaving || isLoadingLists}
+                                                        >
+                                                            <option value="">Select a contact list</option>
+                                                            {contactLists.map((list) => (
+                                                                <option
+                                                                    key={list._id}
+                                                                    value={list._id}
+                                                                >
+                                                                    {list.name} ({list.contactCount || 0} contacts)
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+
+                                                <div className="radio-group">
+                                                    <label className="radio-label">
+                                                        <input
+                                                            type="radio"
+                                                            checked={createNewList}
+                                                            onChange={() => setCreateNewList(true)}
+                                                            disabled={isSaving}
+                                                        />
+                                                        <span>Create a new contact list</span>
+                                                    </label>
+                                                </div>
+
+                                                {createNewList && (
+                                                    <div className="new-list-input">
+                                                        <input
+                                                            type="text"
+                                                            value={newListName}
+                                                            onChange={(e) => setNewListName(e.target.value)}
+                                                            placeholder="Enter list name"
+                                                            disabled={isSaving}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="manual-sync-button-container">
+                                                <button
+                                                    className="manual-sync-button"
+                                                    onClick={triggerManualSync}
+                                                    disabled={isSaving || syncingStatus === 'syncing'}
+                                                >
+                                                    {syncingStatus === 'syncing' ? (
+                                                        <>
+                                                            <RefreshCw
+                                                                size={16}
+                                                                className="spinner"
+                                                            />
+                                                            <span>Syncing users...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <UserPlus size={16} />
+                                                            <span>Sync Users Now</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            <div className="sync-info-note">
+                                                <Info size={16} />
+                                                <p>Auto-sync will import all Firebase Authentication users into the selected contact list. Users will be matched by email address to prevent duplicates. Manual sync can be triggered at any time.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="form-actions">
                                 <button
