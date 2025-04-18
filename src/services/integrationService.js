@@ -55,23 +55,47 @@ export async function createIntegration(integrationData) {
 }
 
 // Update an integration
+// Update the updateIntegration function in src/services/integrationService.js:
+
 export async function updateIntegration(integrationId, brandId, userId, updateData) {
     await connectToDatabase();
 
-    const integration = await Integration.findOneAndUpdate(
-        {
-            _id: new mongoose.Types.ObjectId(integrationId),
-            brandId: new mongoose.Types.ObjectId(brandId),
-            userId: new mongoose.Types.ObjectId(userId),
-        },
-        {
-            ...updateData,
-            updatedAt: new Date(),
-        },
-        { new: true }
-    );
+    // Deep copy the updateData to avoid modifying the original
+    const dataToUpdate = JSON.parse(JSON.stringify(updateData));
 
-    return integration;
+    // Ensure config and tableSyncs are properly handled
+    if (dataToUpdate.config) {
+        // Make sure tableSyncs is an array if it exists
+        if ('tableSyncs' in dataToUpdate.config) {
+            if (!Array.isArray(dataToUpdate.config.tableSyncs)) {
+                console.warn('tableSyncs is not an array, setting to empty array');
+                dataToUpdate.config.tableSyncs = [];
+            }
+        }
+    }
+
+    try {
+        const integration = await Integration.findOneAndUpdate(
+            {
+                _id: new mongoose.Types.ObjectId(integrationId),
+                brandId: new mongoose.Types.ObjectId(brandId),
+                userId: new mongoose.Types.ObjectId(userId),
+            },
+            {
+                ...dataToUpdate,
+                updatedAt: new Date(),
+            },
+            {
+                new: true, // Return the updated document
+                runValidators: true, // Run schema validators
+            }
+        );
+
+        return integration;
+    } catch (error) {
+        console.error('Error updating integration:', error);
+        throw error;
+    }
 }
 
 // Delete an integration

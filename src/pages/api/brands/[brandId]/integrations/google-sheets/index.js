@@ -1,102 +1,121 @@
-import { getServerSession } from 'next-auth';
+// src/pages/api/brands/[id]/integrations/google-sheets.js
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { getBrandById } from '@/services/brandService';
-import { getIntegrationByType, createIntegration, updateIntegration } from '@/services/integrationService';
+import { createIntegration, getIntegrationByType, updateIntegration } from '@/services/integrationService';
 
 export default async function handler(req, res) {
-    try {
-        // Connect to database
-        await connectToDatabase();
+    const { brandId } = req.query;
 
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
+    // Handle GET request to fetch integration
+    if (req.method === 'GET') {
+        try {
+            // Authenticate the user
+            const session = await getServerSession(req, res, authOptions);
+            if (!session) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
 
-        if (!session || !session.user) {
-            return res.status(401).json({ message: 'Unauthorized' });
+            // Fetch the integration
+            const integration = await getIntegrationByType('google_sheets', brandId, session.user.id);
+
+            // If integration exists, return it
+            if (integration) {
+                return res.status(200).json(integration);
+            }
+
+            // If no integration found, return empty object
+            return res.status(200).json(null);
+        } catch (error) {
+            console.error('Error fetching Google Sheets integration:', error);
+            return res.status(500).json({ message: 'Server error' });
         }
+    }
 
-        const userId = session.user.id;
-        const { brandId } = req.query;
+    // Handle POST request to create or update integration
+    if (req.method === 'POST') {
+        try {
+            // Authenticate the user
+            const session = await getServerSession(req, res, authOptions);
+            if (!session) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
 
-        if (!brandId) {
-            return res.status(400).json({ message: 'Missing brand ID' });
-        }
+            const { name, serviceAccountJson, tableSyncs } = req.body;
 
-        // Check if the brand belongs to the user
-        const brand = await getBrandById(brandId);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
-
-        if (brand.userId.toString() !== userId) {
-            return res.status(403).json({ message: 'Not authorized to access this brand' });
-        }
-
-        // GET - Get Google Sheets integration if it exists
-        if (req.method === 'GET') {
-            const integration = await getIntegrationByType('google_sheets', brandId, userId);
-            return res.status(200).json(integration || null);
-        }
-
-        // POST - Create/Update Google Sheets integration
-        if (req.method === 'POST') {
-            const { name, serviceAccountJson } = req.body;
+            // Validate input
+            if (!name) {
+                return res.status(400).json({ message: 'Name is required' });
+            }
 
             if (!serviceAccountJson) {
                 return res.status(400).json({ message: 'Service account JSON is required' });
             }
 
-            // Validate the service account JSON
+            let serviceAccount;
+
             try {
-                const parsedConfig = JSON.parse(serviceAccountJson);
-
-                // Check required fields in service account JSON
-                const requiredFields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email'];
-                for (const field of requiredFields) {
-                    if (!parsedConfig[field]) {
-                        return res.status(400).json({ message: `Invalid service account JSON: missing ${field}` });
-                    }
-                }
-
-                // Check if Google Sheets integration already exists
-                const existingIntegration = await getIntegrationByType('google_sheets', brandId, userId);
-
-                if (existingIntegration) {
-                    // Update existing integration
-                    const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, userId, {
-                        name: name || 'Google Sheets Integration',
-                        config: {
-                            serviceAccount: parsedConfig,
-                            projectId: parsedConfig.project_id,
-                        },
-                        status: 'active',
-                    });
-                    return res.status(200).json(updatedIntegration);
-                } else {
-                    // Create new integration
-                    const integration = await createIntegration({
-                        name: name || 'Google Sheets Integration',
-                        type: 'google_sheets',
-                        config: {
-                            serviceAccount: parsedConfig,
-                            projectId: parsedConfig.project_id,
-                        },
-                        status: 'active',
-                        brandId,
-                        userId,
-                    });
-                    return res.status(201).json(integration);
-                }
+                // Parse the service account JSON
+                serviceAccount = JSON.parse(serviceAccountJson);
             } catch (error) {
-                console.error('Error processing Google Sheets service account:', error);
-                return res.status(400).json({ message: 'Invalid service account JSON format' });
+                return res.status(400).json({ message: 'Invalid service account JSON' });
             }
-        }
 
-        return res.status(405).json({ message: 'Method not allowed' });
-    } catch (error) {
-        console.error('Error handling Google Sheets integration:', error);
-        return res.status(500).json({ message: 'Internal server error', error: error.message });
+            // Basic validation for required fields
+            if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+                return res.status(400).json({ message: 'Invalid service account JSON: missing required fields' });
+            }
+
+            // Check if integration already exists
+            const existingIntegration = await getIntegrationByType('google_sheets', brandId, session.user.id);
+
+            if (existingIntegration) {
+                // Ensure tableSyncs is an array and log it for debugging
+                const updatedTableSyncs = Array.isArray(tableSyncs) ? tableSyncs : [];
+                console.log('Updating integration with tableSyncs:', JSON.stringify(updatedTableSyncs));
+
+                // Update existing integration with explicit config structure
+                const updatedConfig = {
+                    serviceAccount,
+                    projectId: serviceAccount.project_id,
+                    tableSyncs: updatedTableSyncs,
+                };
+
+                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, session.user.id, {
+                    name,
+                    config: updatedConfig,
+                    status: 'active',
+                });
+
+                return res.status(200).json(updatedIntegration);
+            } else {
+                // Ensure tableSyncs is an array
+                const initialTableSyncs = Array.isArray(tableSyncs) ? tableSyncs : [];
+                console.log('Creating integration with tableSyncs:', JSON.stringify(initialTableSyncs));
+
+                // Create new integration with explicit config structure
+                const config = {
+                    serviceAccount,
+                    projectId: serviceAccount.project_id,
+                    tableSyncs: initialTableSyncs,
+                };
+
+                const newIntegration = await createIntegration({
+                    name,
+                    type: 'google_sheets',
+                    userId: session.user.id,
+                    brandId,
+                    config,
+                    status: 'active',
+                });
+
+                return res.status(201).json(newIntegration);
+            }
+        } catch (error) {
+            console.error('Error creating/updating Google Sheets integration:', error);
+            return res.status(500).json({ message: 'Server error' });
+        }
     }
+
+    // If method is not supported
+    return res.status(405).json({ message: 'Method not allowed' });
 }

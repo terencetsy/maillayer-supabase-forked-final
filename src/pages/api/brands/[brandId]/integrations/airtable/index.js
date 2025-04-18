@@ -1,84 +1,101 @@
-import { getServerSession } from 'next-auth';
+// src/pages/api/brands/[id]/integrations/airtable.js
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { getBrandById } from '@/services/brandService';
-import { getIntegrationByType, createIntegration, updateIntegration } from '@/services/integrationService';
+import { createIntegration, getIntegrationByType, updateIntegration } from '@/services/integrationService';
 
 export default async function handler(req, res) {
-    try {
-        // Connect to database
-        await connectToDatabase();
+    const { brandId } = req.query;
 
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
+    // Handle GET request to fetch integration
+    if (req.method === 'GET') {
+        try {
+            // Authenticate the user
+            const session = await getServerSession(req, res, authOptions);
+            if (!session) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
 
-        if (!session || !session.user) {
-            return res.status(401).json({ message: 'Unauthorized' });
+            // Fetch the integration
+            const integration = await getIntegrationByType('airtable', brandId, session.user.id);
+
+            // If integration exists, return it
+            if (integration) {
+                return res.status(200).json(integration);
+            }
+
+            // If no integration found, return empty object
+            return res.status(200).json(null);
+        } catch (error) {
+            console.error('Error fetching Airtable integration:', error);
+            return res.status(500).json({ message: 'Server error' });
         }
+    }
 
-        const userId = session.user.id;
-        const { brandId } = req.query;
+    // Handle POST request to create or update integration
+    if (req.method === 'POST') {
+        try {
+            // Authenticate the user
+            const session = await getServerSession(req, res, authOptions);
+            if (!session) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
 
-        if (!brandId) {
-            return res.status(400).json({ message: 'Missing brand ID' });
-        }
+            const { name, apiKey, tableSyncs } = req.body;
 
-        // Check if the brand belongs to the user
-        const brand = await getBrandById(brandId);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
-
-        if (brand.userId.toString() !== userId) {
-            return res.status(403).json({ message: 'Not authorized to access this brand' });
-        }
-
-        // GET - Get Airtable integration if it exists
-        if (req.method === 'GET') {
-            const integration = await getIntegrationByType('airtable', brandId, userId);
-            return res.status(200).json(integration || null);
-        }
-
-        // POST - Create/Update Airtable integration
-        if (req.method === 'POST') {
-            const { name, apiKey } = req.body;
+            // Validate input
+            if (!name) {
+                return res.status(400).json({ message: 'Name is required' });
+            }
 
             if (!apiKey) {
-                return res.status(400).json({ message: 'Airtable API key is required' });
+                return res.status(400).json({ message: 'API key is required' });
             }
 
-            // Check if Airtable integration already exists
-            const existingIntegration = await getIntegrationByType('airtable', brandId, userId);
+            // Ensure tableSyncs is an array and log it for debugging
+            const updatedTableSyncs = Array.isArray(tableSyncs) ? tableSyncs : [];
+            console.log('Updating integration with tableSyncs:', JSON.stringify(updatedTableSyncs));
+
+            // Check if integration already exists
+            const existingIntegration = await getIntegrationByType('airtable', brandId, session.user.id);
 
             if (existingIntegration) {
-                // Update existing integration
-                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, userId, {
-                    name: name || 'Airtable Integration',
-                    config: {
-                        apiKey: apiKey,
-                    },
+                // Update existing integration with explicit config structure
+                const updatedConfig = {
+                    apiKey,
+                    tableSyncs: updatedTableSyncs,
+                };
+
+                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, session.user.id, {
+                    name,
+                    config: updatedConfig,
                     status: 'active',
                 });
+
                 return res.status(200).json(updatedIntegration);
             } else {
-                // Create new integration
-                const integration = await createIntegration({
-                    name: name || 'Airtable Integration',
-                    type: 'airtable',
-                    config: {
-                        apiKey: apiKey,
-                    },
-                    status: 'active',
-                    brandId,
-                    userId,
-                });
-                return res.status(201).json(integration);
-            }
-        }
+                // Create new integration with explicit config structure
+                const config = {
+                    apiKey,
+                    tableSyncs: updatedTableSyncs,
+                };
 
-        return res.status(405).json({ message: 'Method not allowed' });
-    } catch (error) {
-        console.error('Error handling Airtable integration:', error);
-        return res.status(500).json({ message: 'Internal server error', error: error.message });
+                const newIntegration = await createIntegration({
+                    name,
+                    type: 'airtable',
+                    userId: session.user.id,
+                    brandId,
+                    config,
+                    status: 'active',
+                });
+
+                return res.status(201).json(newIntegration);
+            }
+        } catch (error) {
+            console.error('Error creating/updating Airtable integration:', error);
+            return res.status(500).json({ message: 'Server error: ' + error.message });
+        }
     }
+
+    // If method is not supported
+    return res.status(405).json({ message: 'Method not allowed' });
 }
