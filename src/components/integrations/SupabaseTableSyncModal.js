@@ -1,11 +1,11 @@
+// src/components/integrations/SupabaseTableSyncModal.js
 import { useState, useEffect } from 'react';
 import { X, RefreshCw, AlertTriangle, Info, Check, Table, Database, ToggleLeft, ToggleRight } from 'lucide-react';
 
-export default function AirtableTableSyncModal({ availableBases, contactLists, initialData, onClose, onSave, isLoadingBases, onFetchBases, brandId }) {
+export default function SupabaseTableSyncModal({ availableTables, contactLists, initialData, onClose, onSave, isLoadingTables, onFetchTables, brandId }) {
     // State for the form
     const [name, setName] = useState('');
-    const [baseId, setBaseId] = useState('');
-    const [tableId, setTableId] = useState('');
+    const [tableName, setTableName] = useState('');
     const [contactListId, setContactListId] = useState('');
     const [createNewList, setCreateNewList] = useState(false);
     const [newListName, setNewListName] = useState('');
@@ -17,18 +17,15 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
         phone: '',
     });
     const [isLoading, setIsLoading] = useState(false);
-    const [tableFields, setTableFields] = useState([]);
+    const [tableColumns, setTableColumns] = useState([]);
     const [error, setError] = useState('');
-    const [activeBase, setActiveBase] = useState(null);
-    const [tableLists, setTableLists] = useState([]);
     const [activeTable, setActiveTable] = useState(null);
 
     // Initialize form with initial data if editing
     useEffect(() => {
         if (initialData) {
             setName(initialData.name || '');
-            setBaseId(initialData.baseId || '');
-            setTableId(initialData.tableId || '');
+            setTableName(initialData.tableName || '');
             setContactListId(initialData.contactListId || '');
             setCreateNewList(initialData.createNewList || false);
             setNewListName(initialData.newListName || '');
@@ -42,73 +39,30 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                 }
             );
 
-            // Find active base and table from available bases
-            if (initialData.baseId) {
-                const base = availableBases.find((b) => b.id === initialData.baseId);
-                if (base) {
-                    setActiveBase(base);
-                    if (initialData.tableId) {
-                        const table = base.tables.find((t) => t.id === initialData.tableId);
-                        if (table) {
-                            setActiveTable(table);
-                        }
-                    }
+            // Find active table from available tables
+            if (initialData.tableName) {
+                const table = availableTables.find((t) => t.name === initialData.tableName);
+                if (table) {
+                    setActiveTable(table);
+                    setTableColumns(table.columns || []);
                 }
             }
         }
-    }, [initialData]);
-
-    // Handle base selection
-    const handleBaseChange = async (e) => {
-        const selectedBaseId = e.target.value;
-        setBaseId(selectedBaseId);
-        setTableId('');
-        setActiveTable(null);
-
-        try {
-            setIsLoading(true);
-            const res = await fetch(`/api/brands/${brandId}/integrations/airtable/fields`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    baseId: selectedBaseId,
-                }),
-                credentials: 'same-origin',
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || 'Failed to fetch table fields');
-            }
-
-            const data = await res.json();
-            console.log(data);
-            setTableLists(data || []);
-        } catch (error) {
-            console.error('Error fetching table fields:', error);
-            setError(error.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    }, [initialData, availableTables]);
 
     // Handle table selection
     const handleTableChange = (e) => {
-        const selectedTableId = e.target.value;
-        setTableId(selectedTableId);
+        const selectedTableName = e.target.value;
+        setTableName(selectedTableName);
 
         // Find and set the active table
-        const table = tableLists.find((t) => t.id === selectedTableId);
-        console.log(table);
+        const table = availableTables.find((t) => t.name === selectedTableName);
         if (table) {
             setActiveTable(table);
-            // Fetch fields for this table
-            setTableFields(table.fields || []);
+            setTableColumns(table.columns || []);
         } else {
             setActiveTable(null);
-            setTableFields([]);
+            setTableColumns([]);
         }
     };
 
@@ -128,12 +82,7 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
             return;
         }
 
-        if (!baseId) {
-            setError('Please select a base');
-            return;
-        }
-
-        if (!tableId) {
+        if (!tableName) {
             setError('Please select a table');
             return;
         }
@@ -156,11 +105,7 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
         // Prepare the data
         const syncData = {
             name,
-            baseId,
-            baseName: activeBase ? activeBase.name : '',
-            baseUrl: activeBase ? activeBase.url : '',
-            tableId,
-            tableName: activeTable ? activeTable.name : '',
+            tableName,
             contactListId,
             createNewList,
             newListName,
@@ -170,8 +115,6 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
             lastSyncedAt: initialData ? initialData.lastSyncedAt : null,
             lastSyncResult: initialData ? initialData.lastSyncResult : null,
         };
-
-        console.log('Saving sync data:', syncData);
 
         // Save the sync
         try {
@@ -189,7 +132,7 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
 
     return (
         <div className="modal-overlay">
-            <div className="modal-container integration-table-sync-modal sheets-sync-modal">
+            <div className="modal-container integration-table-sync-modal">
                 <div className="modal-header">
                     <h3>{initialData ? 'Edit Table Sync' : 'Add Table Sync'}</h3>
                     <button
@@ -228,15 +171,18 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                         </div>
 
                         <div className="form-section">
-                            <h4 className="section-title">Airtable Selection</h4>
+                            <h4 className="section-title">
+                                <Database size={16} />
+                                Supabase Table Selection
+                            </h4>
 
                             <div className="sheet-selection-actions">
                                 <button
                                     className="refresh-sheets-button"
-                                    onClick={onFetchBases}
-                                    disabled={isLoadingBases}
+                                    onClick={onFetchTables}
+                                    disabled={isLoadingTables}
                                 >
-                                    {isLoadingBases ? (
+                                    {isLoadingTables ? (
                                         <RefreshCw
                                             size={14}
                                             className="spinner"
@@ -244,56 +190,34 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                                     ) : (
                                         <RefreshCw size={14} />
                                     )}
-                                    <span>Refresh Bases</span>
+                                    <span>Refresh Tables</span>
                                 </button>
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="base">Base</label>
+                                <label htmlFor="table">Table</label>
                                 <select
-                                    id="base"
-                                    value={baseId}
-                                    onChange={handleBaseChange}
+                                    id="table"
+                                    value={tableName}
+                                    onChange={handleTableChange}
                                     required
                                 >
-                                    <option value="">Select a base</option>
-                                    {availableBases.map((base) => (
+                                    <option value="">Select a table</option>
+                                    {availableTables.map((table) => (
                                         <option
-                                            key={base.id}
-                                            value={base.id}
+                                            key={table.id}
+                                            value={table.name}
                                         >
-                                            {base.name}
+                                            {table.name}
                                         </option>
                                     ))}
                                 </select>
                             </div>
-
-                            {tableLists.length > 0 && (
-                                <div className="form-group">
-                                    <label htmlFor="table">Table</label>
-                                    <select
-                                        id="table"
-                                        value={tableId}
-                                        onChange={handleTableChange}
-                                        required
-                                    >
-                                        <option value="">Select a table</option>
-                                        {tableLists.map((table) => (
-                                            <option
-                                                key={table.id}
-                                                value={table.id}
-                                            >
-                                                {table.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
                         </div>
 
                         <div className="form-section">
                             <h4 className="section-title">Field Mapping</h4>
-                            <div className="field-description">Map Airtable fields to contact fields</div>
+                            <div className="field-description">Map Supabase table columns to contact fields</div>
 
                             <div className="mapping-fields">
                                 <div className="form-group required">
@@ -305,12 +229,12 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                                         required
                                     >
                                         <option value="">Select a field</option>
-                                        {tableFields.map((field) => (
+                                        {tableColumns.map((column) => (
                                             <option
-                                                key={field.id}
-                                                value={field.id}
+                                                key={column.name}
+                                                value={column.name}
                                             >
-                                                {field.name}
+                                                {column.name}
                                             </option>
                                         ))}
                                     </select>
@@ -324,12 +248,12 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                                         onChange={(e) => handleMappingChange('firstName', e.target.value)}
                                     >
                                         <option value="">Select a field</option>
-                                        {tableFields.map((field) => (
+                                        {tableColumns.map((column) => (
                                             <option
-                                                key={field.id}
-                                                value={field.id}
+                                                key={column.name}
+                                                value={column.name}
                                             >
-                                                {field.name}
+                                                {column.name}
                                             </option>
                                         ))}
                                     </select>
@@ -343,12 +267,12 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                                         onChange={(e) => handleMappingChange('lastName', e.target.value)}
                                     >
                                         <option value="">Select a field</option>
-                                        {tableFields.map((field) => (
+                                        {tableColumns.map((column) => (
                                             <option
-                                                key={field.id}
-                                                value={field.id}
+                                                key={column.name}
+                                                value={column.name}
                                             >
-                                                {field.name}
+                                                {column.name}
                                             </option>
                                         ))}
                                     </select>
@@ -362,12 +286,12 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
                                         onChange={(e) => handleMappingChange('phone', e.target.value)}
                                     >
                                         <option value="">Select a field</option>
-                                        {tableFields.map((field) => (
+                                        {tableColumns.map((column) => (
                                             <option
-                                                key={field.id}
-                                                value={field.id}
+                                                key={column.name}
+                                                value={column.name}
                                             >
-                                                {field.name}
+                                                {column.name}
                                             </option>
                                         ))}
                                     </select>
@@ -461,7 +385,7 @@ export default function AirtableTableSyncModal({ availableBases, contactLists, i
 
                             <div className="sync-info-note">
                                 <Info size={16} />
-                                <p>Auto-sync will import data from the selected Airtable table into the contact list. Contacts will be matched by email address to prevent duplicates.</p>
+                                <p>Auto-sync will import data from the selected Supabase table into the contact list. Contacts will be matched by email address to prevent duplicates.</p>
                             </div>
                         </div>
                     </div>

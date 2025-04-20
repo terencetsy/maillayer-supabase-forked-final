@@ -213,7 +213,7 @@ export default function SheetsTableSyncModal({ availableSheets, contactLists, in
 
     return (
         <div className="modal-overlay">
-            <div className="modal-container sheets-sync-modal">
+            <div className="modal-container integration-table-sync-modal sheets-sync-modal">
                 <div className="modal-header">
                     <h3>{initialData ? 'Edit Table Sync' : 'Add Table Sync'}</h3>
                     <button
@@ -327,7 +327,7 @@ export default function SheetsTableSyncModal({ availableSheets, contactLists, in
                                 <div className="field-description">The row number that contains column headers (usually row 1)</div>
                             </div>
 
-                            <div className="form-group checkbox-group">
+                            <div className="sheet-checkbox form-group checkbox-group">
                                 <label className="checkbox-label">
                                     <input
                                         type="checkbox"

@@ -132,7 +132,6 @@ export default function BrandIntegrations() {
                             </Link>
                         </div>
                     </div>
-
                     {/* Airtable Integration */}
                     <div className="integration-card">
                         <div className="integration-icon airtable">
@@ -163,26 +162,6 @@ export default function BrandIntegrations() {
                             </Link>
                         </div>
                     </div>
-
-                    {/* Supabase Integration (Coming Soon) */}
-                    <div className="integration-card disabled">
-                        <div className="integration-icon supabase">
-                            <Database size={24} />
-                        </div>
-                        <div className="integration-info">
-                            <h3>Supabase</h3>
-                            <p>Connect to Supabase to sync users and send transactional emails</p>
-                            <div className="integration-status">
-                                <div className="status-badge badge-default">Coming Soon</div>
-                            </div>
-                        </div>
-                        <div className="integration-action">
-                            <button className="integration-button disabled">
-                                Connect
-                                <ArrowRight size={16} />
-                            </button>
-                        </div>
-                    </div>
                     {/* Google Sheets Integration */}
                     <div className="integration-card">
                         <div className="integration-icon google-sheets">
@@ -211,6 +190,25 @@ export default function BrandIntegrations() {
                                 {getIntegrationByType('google_sheets') ? 'Manage' : 'Connect'}
                                 <ArrowRight size={16} />
                             </Link>
+                        </div>
+                    </div>
+                    {/* Supabase Integration (Coming Soon) */}
+                    <div className="integration-card disabled">
+                        <div className="integration-icon supabase">
+                            <Database size={24} />
+                        </div>
+                        <div className="integration-info">
+                            <h3>Supabase</h3>
+                            <p>Connect to Supabase to sync users and send transactional emails</p>
+                            <div className="integration-status">
+                                <div className="status-badge badge-default">Coming Soon</div>
+                            </div>
+                        </div>
+                        <div className="integration-action">
+                            <button className="integration-button disabled">
+                                Connect
+                                <ArrowRight size={16} />
+                            </button>
                         </div>
                     </div>
                     {/* Auth0 Integration (Coming Soon) */}
