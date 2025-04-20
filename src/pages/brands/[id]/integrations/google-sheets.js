@@ -313,10 +313,18 @@ export default function GoogleSheetsIntegration() {
         setShowSyncModal(true);
     };
 
+    // In the Google Sheets integration page
     const handleSaveTableSync = (syncData) => {
-        console.log('Saving table sync:', syncData);
-
         let updatedSyncs = [];
+
+        // If creating a new list, make sure contactListId is null or undefined, not an empty string
+        if (syncData.createNewList) {
+            syncData.contactListId = null; // or undefined
+        } else if (!syncData.contactListId) {
+            // If not creating a new list and no list selected, show error
+            setError('Please select a contact list or choose to create a new one');
+            return;
+        }
 
         if (editingSyncId) {
             // Update existing sync
@@ -394,21 +402,52 @@ export default function GoogleSheetsIntegration() {
         setShowDeleteSyncConfirm(true);
     };
 
-    const handleDeleteSync = () => {
+    const handleDeleteSync = async () => {
         if (!deletingSyncId) return;
 
-        setTableSyncs(tableSyncs.filter((sync) => sync.id !== deletingSyncId));
-        setShowDeleteSyncConfirm(false);
-        setDeletingSyncId(null);
+        try {
+            setIsSaving(true);
+
+            // Call the API to remove the sync
+            const res = await fetch(`/api/brands/${id}/integrations/google-sheets/remove-sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    syncId: deletingSyncId,
+                    removeData: false, // Change to true if you want to also remove the imported contacts
+                }),
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed to remove sync');
+            }
+
+            // Update local state
+            const updatedTableSyncs = tableSyncs.filter((sync) => sync.id !== deletingSyncId);
+            setTableSyncs(updatedTableSyncs);
+
+            setSuccess('Sync configuration removed successfully');
+
+            // Refresh the integration data to ensure everything is in sync
+            await fetchGoogleSheetsIntegration();
+        } catch (error) {
+            console.error('Error removing sync:', error);
+            setError(error.message);
+        } finally {
+            setIsSaving(false);
+            setShowDeleteSyncConfirm(false);
+            setDeletingSyncId(null);
+        }
     };
 
     const getEditingSyncData = () => {
         if (!editingSyncId) return null;
         return tableSyncs.find((sync) => sync.id === editingSyncId);
     };
-
-    // Replace the handleRunSync function:
-
     const handleRunSync = async (syncId) => {
         const syncToRun = tableSyncs.find((sync) => sync.id === syncId);
         if (!syncToRun) return;
@@ -445,7 +484,17 @@ export default function GoogleSheetsIntegration() {
             const data = await res.json();
             console.log('Sync completed successfully:', data);
 
-            // Update the sync status, timestamp, and results
+            // Check if a new list was created during the sync
+            if (data.newList) {
+                console.log('New list was created:', data.newList);
+
+                // Refresh the entire integration to get the updated tableSyncs with the new contactListId
+                await fetchGoogleSheetsIntegration();
+                setSuccess(`Successfully synced ${data.importedCount} contacts from Google Sheets to new list: ${data.newList.name}!`);
+                return;
+            }
+
+            // If no new list was created, just update the sync status
             const newTableSyncs = [...tableSyncs];
             const updatedSyncIndex = newTableSyncs.findIndex((sync) => sync.id === syncId);
 

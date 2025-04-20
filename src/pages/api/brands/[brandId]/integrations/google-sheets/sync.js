@@ -1,12 +1,13 @@
 // src/pages/api/brands/[id]/integrations/google-sheets/sync.js
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { getIntegrationByType, updateIntegration } from '@/services/integrationService';
+import { getIntegrationByType } from '@/services/integrationService';
 import { google } from 'googleapis';
 import connectToDatabase from '@/lib/mongodb';
 import Contact from '@/models/Contact';
 import ContactList from '@/models/ContactList';
 import mongoose from 'mongoose';
+import Integration from '@/models/Integration'; // Add this import
 
 export default async function handler(req, res) {
     // Only allow POST requests
@@ -112,6 +113,7 @@ export default async function handler(req, res) {
         let newList = null;
 
         if (tableSync.createNewList && tableSync.newListName) {
+            console.log('### creating new contact list...');
             // Create a new contact list
             const contactList = new ContactList({
                 name: tableSync.newListName,
@@ -126,28 +128,39 @@ export default async function handler(req, res) {
             await contactList.save();
             contactListId = contactList._id;
             newList = contactList;
+            console.log('Created new contact list with ID:', contactListId.toString());
 
-            // Update the sync config to use this list from now on
-            const tableSyncs = [...(integration.config.tableSyncs || [])];
-            const syncIndex = tableSyncs.findIndex((sync) => sync.id === syncId);
+            // Update the sync config using direct MongoDB update
+            const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
+            console.log('Sync index:', syncIndex);
 
             if (syncIndex !== -1) {
-                tableSyncs[syncIndex] = {
-                    ...tableSyncs[syncIndex],
-                    contactListId: contactList._id.toString(),
+                // Create the update path for this specific sync in the array
+                const updatePath = `config.tableSyncs.${syncIndex}`;
+
+                // Create a copy of the sync with updated values
+                const updatedSync = {
+                    ...integration.config.tableSyncs[syncIndex],
+                    contactListId: contactListId.toString(),
                     createNewList: false,
                     newListName: '',
                 };
 
-                // Create a new config object preserving all existing properties
-                const updatedConfig = {
-                    ...integration.config,
-                    tableSyncs,
-                };
+                console.log('Updated sync:', updatedSync);
 
-                await updateIntegration(integration._id, brandId, session.user.id, {
-                    config: updatedConfig,
-                });
+                try {
+                    // Perform direct MongoDB update
+                    const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: { [updatePath]: updatedSync } });
+
+                    console.log('MongoDB update result:', updateResult);
+
+                    if (updateResult.modifiedCount === 0) {
+                        console.log('WARNING: Integration update did not modify any documents');
+                    }
+                } catch (updateError) {
+                    console.error('Error updating integration with new contact list:', updateError);
+                    // Continue with the sync even if the update fails
+                }
             }
         } else {
             contactListId = tableSync.contactListId;
@@ -239,34 +252,38 @@ export default async function handler(req, res) {
         }
 
         // Update the lastSyncedAt timestamp and result in the table sync configuration
-        const tableSyncs = [...(integration.config.tableSyncs || [])];
-        const syncIndex = tableSyncs.findIndex((sync) => sync.id === syncId);
+        const now = new Date();
+
+        // Find the sync index again to make sure we have the latest info
+        const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
 
         if (syncIndex !== -1) {
-            const now = new Date();
-            tableSyncs[syncIndex] = {
-                ...tableSyncs[syncIndex],
-                lastSyncedAt: now.toISOString(),
-                lastSyncResult: {
+            // Create the update path for this specific sync in the array
+            const updatePath = `config.tableSyncs.${syncIndex}`;
+
+            // Update the sync status and results
+            const updateData = {
+                [`${updatePath}.lastSyncedAt`]: now.toISOString(),
+                [`${updatePath}.status`]: 'success',
+                [`${updatePath}.lastSyncResult`]: {
                     importedCount,
                     updatedCount,
                     skippedCount,
                     totalCount: dataRows.length,
                 },
-                status: 'success', // Make sure we update the status
             };
 
-            console.log('Updating integration with new sync results:', JSON.stringify(tableSyncs[syncIndex]));
+            // Update the integration with sync results
+            console.log('Updating integration with sync results:', JSON.stringify(updateData));
 
-            // Create a new config object preserving all existing properties
-            const updatedConfig = {
-                ...integration.config,
-                tableSyncs,
-            };
+            try {
+                const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: updateData });
 
-            await updateIntegration(integration._id, brandId, session.user.id, {
-                config: updatedConfig,
-            });
+                console.log('Sync results update result:', updateResult);
+            } catch (updateError) {
+                console.error('Error updating integration with sync results:', updateError);
+                // Continue with the response even if the update fails
+            }
         }
 
         // Update contact count for the list
