@@ -97,13 +97,13 @@ export default function BrandLayout({ children, brand }) {
                             <BarChart size={20} />
                             <span>Transactional</span>
                         </Link>
-                        {/* <Link
+                        <Link
                             href={`/brands/${brand._id}/integrations`}
                             className={`nav-item ${router.pathname.includes('/brands/[id]/integrations') ? 'active' : ''}`}
                         >
                             <Database size={18} />
                             Integrations
-                        </Link> */}
+                        </Link>
                         <Link
                             href={`/brands/${brand._id}/settings`}
                             className={`nav-item ${activeMenuItem === 'settings' ? 'active' : ''}`}
