@@ -160,7 +160,7 @@ const DailyContactsChart = ({ brandId, listId, days = 30, status = 'all' }) => {
                             vertical={false}
                         />
                         <XAxis
-                            dataKey="formattedDate"
+                            dataKey="date"
                             tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 12 }}
                             axisLine={{ stroke: '#2e2e2e' }}
                             tickLine={{ stroke: '#2e2e2e' }}
