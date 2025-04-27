@@ -72,18 +72,48 @@ async function connectToDatabase() {
 
         const ContactSchema = new mongoose.Schema(
             {
-                email: String,
-                firstName: String,
-                lastName: String,
-                phone: String,
-                listId: mongoose.Schema.Types.ObjectId,
-                brandId: mongoose.Schema.Types.ObjectId,
-                userId: mongoose.Schema.Types.ObjectId,
-                status: String,
-                createdAt: Date,
-                updatedAt: Date,
+                email: {
+                    type: String,
+                    required: true,
+                    lowercase: true,
+                    trim: true,
+                },
+                firstName: {
+                    type: String,
+                    trim: true,
+                },
+                lastName: {
+                    type: String,
+                    trim: true,
+                },
+                phone: {
+                    type: String,
+                    trim: true,
+                },
+                listId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'ContactList',
+                    required: true,
+                },
+                brandId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Brand',
+                    required: true,
+                },
+                userId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'User',
+                    required: true,
+                },
+                status: {
+                    type: String,
+                    default: 'active',
+                },
             },
-            { collection: 'contacts' }
+            {
+                timestamps: true,
+                collection: 'contacts',
+            }
         );
 
         const ContactListSchema = new mongoose.Schema(
@@ -218,6 +248,7 @@ async function syncUsersToContacts(users, listId, brandId, userId, lastSyncedAt)
                     brandId: new mongoose.Types.ObjectId(brandId),
                     userId: new mongoose.Types.ObjectId(userId),
                     updatedAt: new Date(),
+                    status: 'active',
                 };
 
                 // For new contacts, use model default ('active') unless Firebase user is disabled
