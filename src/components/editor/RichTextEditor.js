@@ -13,6 +13,7 @@ import { uploadImageToSpaces } from '@/lib/imageUploadService';
 import EditorToolbar from './EditorToolbar';
 import { ImageUpload } from './ImageUploadExtension';
 import { ImageResize } from './ImageResizeExtension';
+import { CustomButton } from './ButtonExtension';
 
 export default function RichTextEditor({ value = '', onChange, placeholder = 'Start writing or drag an image...', editable = true }) {
     const [isMounted, setIsMounted] = useState(false);
@@ -134,6 +135,7 @@ export default function RichTextEditor({ value = '', onChange, placeholder = 'St
                 HTMLAttributes: {
                     class: 'editor-link',
                 },
+                allowStyle: true,
             }),
             CustomImage.configure({
                 inline: false,
@@ -152,6 +154,7 @@ export default function RichTextEditor({ value = '', onChange, placeholder = 'St
                 uploadImage: handleImageUpload,
             }),
             ImageResize,
+            CustomButton, // Custom button extension
         ],
         editable,
         content: value || getDefaultEmailTemplate(),

@@ -85,7 +85,18 @@ export default function EditorToolbar({ editor }) {
         const url = window.prompt('Button URL:');
 
         if (text && url) {
-            editor.chain().focus().insertContent(`<a href="${url}" class="button button-primary" target="_blank">${text}</a>`).run();
+            editor
+                .chain()
+                .focus()
+                .insertContent({
+                    type: 'button',
+                    attrs: {
+                        href: url,
+                        buttonText: text,
+                        buttonStyle: 'primary',
+                    },
+                })
+                .run();
         }
     };
 
