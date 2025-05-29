@@ -13409,3 +13409,294 @@ h4 {
         }
     }
 }
+
+/* HTML Editor Styles */
+.html-editor-container {
+    display: flex;
+    flex-direction: column;
+    background-color: #111111;
+    border-radius: 8px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+}
+
+.html-editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2e2e2e;
+}
+
+.toolbar-left {
+    display: flex;
+    gap: 4px;
+}
+
+.toolbar-right {
+    display: flex;
+    gap: 8px;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+        background-color: #2e2e2e;
+        color: #ffffff;
+    }
+
+    &.active {
+        background-color: #5d87ff;
+        color: #ffffff;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.format-btn {
+    background-color: rgba(93, 135, 255, 0.1);
+    border: 1px solid rgba(93, 135, 255, 0.3);
+    color: #5d87ff;
+
+    &:hover:not(:disabled) {
+        background-color: rgba(93, 135, 255, 0.2);
+    }
+}
+
+.html-editor-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background-color: rgba(239, 68, 68, 0.1);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    font-size: 13px;
+}
+
+.html-editor-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.html-textarea {
+    flex: 1;
+    min-height: 400px;
+    padding: 16px;
+    background-color: #000000;
+    border: none;
+    color: #ffffff;
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+
+    &::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    &:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+}
+
+.html-preview {
+    flex: 1;
+    min-height: 400px;
+    overflow-y: auto;
+
+    .preview-content {
+        padding: 16px;
+        background-color: #ffffff;
+        color: #333333;
+        min-height: 100%;
+
+        /* Apply email-like styling */
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            color: #222222;
+        }
+
+        p {
+            margin-bottom: 1em;
+        }
+
+        a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        ul,
+        ol {
+            margin-left: 1.5em;
+            margin-bottom: 1em;
+        }
+
+        blockquote {
+            border-left: 3px solid #dddddd;
+            padding-left: 1em;
+            color: #666666;
+            margin: 1em 0;
+        }
+
+        code {
+            background-color: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background-color: #f5f5f5;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    }
+}
+
+/* Unified Editor Styles */
+.unified-editor {
+    display: flex;
+    flex-direction: column;
+    background-color: #111111;
+    border-radius: 8px;
+    border: 1px solid #2e2e2e;
+    overflow: hidden;
+}
+
+.editor-mode-selector {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2e2e2e;
+}
+
+.mode-tabs {
+    display: flex;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    padding: 4px;
+    border: 1px solid #2e2e2e;
+}
+
+.mode-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover:not(:disabled) {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+    }
+
+    &.active {
+        background-color: #5d87ff;
+        color: #ffffff;
+        box-shadow: 0 2px 4px rgba(93, 135, 255, 0.3);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.editor-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.current-mode {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.editor-content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Override RichTextEditor styles when used in UnifiedEditor */
+.unified-editor .editorContainer {
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+}
+
+.unified-editor .editorToolbar {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2e2e2e;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .editor-mode-selector {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mode-tabs {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .mode-tab {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .mode-tab span {
+        display: none;
+    }
+}

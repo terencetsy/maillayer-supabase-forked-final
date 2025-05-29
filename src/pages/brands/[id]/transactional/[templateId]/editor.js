@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import RichTextEditor from '@/components/editor/RichTextEditor';
 import { ArrowLeft, Save, Code, Info, CheckCircle, Clock, AlertCircle, Send, AlertTriangle } from 'lucide-react';
+import UnifiedEditor from '@/components/editor/UnifiedEditor';
 
 export default function TemplateEditor() {
     const { data: session, status } = useSession();
@@ -401,11 +401,12 @@ export default function TemplateEditor() {
                         <span>Email template editor - Use [variableName] to define dynamic content</span>
                     </div>
 
-                    <RichTextEditor
+                    <UnifiedEditor
                         value={content}
                         onChange={handleContentChange}
-                        placeholder="Write your email content or drag images here..."
+                        placeholder="Design your template or write HTML..."
                         editable={true}
+                        defaultMode="visual"
                     />
                 </div>
             </div>

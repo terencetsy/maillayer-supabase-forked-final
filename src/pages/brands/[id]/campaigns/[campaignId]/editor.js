@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import RichTextEditor from '@/components/editor/RichTextEditor';
 import { ArrowLeft, Save, Send, Info } from 'lucide-react';
+import UnifiedEditor from '@/components/editor/UnifiedEditor';
 
 export default function CampaignEditor() {
     const { data: session, status } = useSession();
@@ -199,11 +199,12 @@ export default function CampaignEditor() {
                         <span>Email preview - Your subscribers will see content as displayed below</span>
                     </div>
 
-                    <RichTextEditor
+                    <UnifiedEditor
                         value={content}
                         onChange={handleContentChange}
-                        placeholder="Write your email content or drag images here..."
+                        placeholder="Write your email content or switch to HTML mode..."
                         editable={true}
+                        defaultMode="visual" // Start with visual editor
                     />
                 </div>
             </div>
