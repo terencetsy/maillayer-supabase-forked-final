@@ -238,8 +238,8 @@ async function syncUsersToContacts(users, listId, brandId, userId, lastSyncedAt)
                     lastName = nameParts.slice(1).join(' ') || '';
                 }
 
-                // Create contact data - without status field for normal updates
-                const contactData = {
+                // Create base contact data WITHOUT status to preserve existing status
+                const baseContactData = {
                     email: user.email.toLowerCase(),
                     firstName,
                     lastName,
@@ -248,19 +248,26 @@ async function syncUsersToContacts(users, listId, brandId, userId, lastSyncedAt)
                     brandId: new mongoose.Types.ObjectId(brandId),
                     userId: new mongoose.Types.ObjectId(userId),
                     updatedAt: new Date(),
-                    status: 'active',
                 };
 
-                // For new contacts, use model default ('active') unless Firebase user is disabled
+                // Build update operations - preserve existing status for existing contacts
                 const updateOps = {
-                    $set: contactData,
-                    $setOnInsert: { createdAt: new Date() },
+                    $set: baseContactData, // Don't include status here to preserve existing values
+                    $setOnInsert: {
+                        createdAt: new Date(),
+                        status: 'active', // Only set status to 'active' for NEW contacts
+                    },
                 };
 
-                // If user is disabled in Firebase, we do want to update the status
-                // This is a legitimate status change we should sync
+                // Only override status in specific cases where Firebase state should take precedence
                 if (user.disabled) {
+                    // If Firebase user is disabled, mark contact as inactive
+                    // This is a legitimate status change we should sync
                     updateOps.$set.status = 'inactive';
+                } else if (user.emailVerified === false) {
+                    // Optional: You might want to handle unverified emails differently
+                    // Uncomment the line below if you want unverified emails to be marked as pending
+                    // updateOps.$set.status = 'pending';
                 }
 
                 // Return an upsert operation
