@@ -142,21 +142,18 @@ export default async function handler(req, res) {
                     const subType = bounceInfo.bounceSubType;
 
                     // Only mark as unsubscribed for permanent bounces
-                    const isPermanent = bounceType === 'Permanent';
+                    // const isPermanent = bounceType === 'Permanent';
 
-                    if (isPermanent) {
-                        // Update contact status directly using the contactId from tags
-                        await Contact.findByIdAndUpdate(contactId, {
-                            status: 'bounced',
-                            isUnsubscribed: true, // For backward compatibility
-                            unsubscribedAt: new Date(),
-                            bouncedAt: new Date(),
-                            bounceType: bounceType,
-                            bounceReason: `${bounceType} - ${subType}`,
-                            unsubscribeReason: `Bounce: ${bounceType} - ${subType}`,
-                            unsubscribedFromCampaign: campaignId,
-                        });
-                    }
+                    await Contact.findByIdAndUpdate(contactId, {
+                        status: 'bounced',
+                        isUnsubscribed: true, // For backward compatibility
+                        unsubscribedAt: new Date(),
+                        bouncedAt: new Date(),
+                        bounceType: bounceType,
+                        bounceReason: `${bounceType} - ${subType}`,
+                        unsubscribeReason: `Bounce: ${bounceType} - ${subType}`,
+                        unsubscribedFromCampaign: campaignId,
+                    });
 
                     // Record the bounce event
                     const TrackingModel = createTrackingModel(campaignId);
