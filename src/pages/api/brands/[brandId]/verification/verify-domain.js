@@ -213,7 +213,7 @@ export default async function handler(req, res) {
                 await sesClient.send(
                     new SetIdentityFeedbackForwardingEnabledCommand({
                         Identity: domain,
-                        ForwardingEnabled: true,
+                        ForwardingEnabled: false,
                     })
                 );
 
@@ -240,7 +240,7 @@ export default async function handler(req, res) {
                         Identity: domain,
                         BounceTopic: topicArn,
                         ComplaintTopic: topicArn,
-                        ForwardingEnabled: true,
+                        ForwardingEnabled: false,
                     })
                 );
             } catch (identityError) {
