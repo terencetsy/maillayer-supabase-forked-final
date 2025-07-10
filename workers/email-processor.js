@@ -593,6 +593,7 @@ async function initializeQueues() {
                 listId: { $in: contactListIds },
                 brandId: brandId,
                 status: 'active',
+                isUnsubscribed: false,
             })
                 .sort({ _id: 1 })
                 .skip(offset)
@@ -933,6 +934,7 @@ async function initializeQueues() {
                     const totalContacts = await Contact.countDocuments({
                         listId: listId,
                         status: 'active',
+                        isUnsubscribed: false,
                     });
 
                     console.log(`Processing list ${listId} with ${totalContacts} contacts`);
@@ -951,6 +953,7 @@ async function initializeQueues() {
                         const contacts = await Contact.find({
                             listId: listId,
                             status: 'active',
+                            isUnsubscribed: false,
                         })
                             .sort({ _id: 1 }) // Ensure consistent ordering
                             .skip(startIndex)
