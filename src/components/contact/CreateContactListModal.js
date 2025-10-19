@@ -54,35 +54,39 @@ export default function CreateContactListModal({ brandId, onClose, onSuccess }) 
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-container">
-                <div className="modal-header">
-                    <h2>Create Contact List</h2>
-                    <button
-                        className="close-btn"
-                        onClick={onClose}
-                        aria-label="Close form"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                {error && (
-                    <div className="form-error">
-                        <AlertCircle size={16} />
-                        <span>{error}</span>
+        <div className="form-modal-overlay">
+            <div className="form-modal">
+                <div className="modal-form-container">
+                    <div className="modal-form-header">
+                        <h2>Create Contact List</h2>
+                        <button
+                            className="modal-form-close"
+                            onClick={onClose}
+                            aria-label="Close form"
+                            type="button"
+                        >
+                            <X size={20} />
+                        </button>
                     </div>
-                )}
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="modal-form"
-                >
-                    <div className="form-group">
-                        <label htmlFor="name">
-                            List Name<span className="required">*</span>
-                        </label>
-                        <div className="input-wrapper">
+                    {error && (
+                        <div className="alert alert--error">
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <form
+                        onSubmit={handleSubmit}
+                        className="form"
+                    >
+                        <div className="form-group">
+                            <label
+                                htmlFor="name"
+                                className="form-label"
+                            >
+                                List Name<span className="form-required">*</span>
+                            </label>
                             <input
                                 id="name"
                                 name="name"
@@ -91,15 +95,17 @@ export default function CreateContactListModal({ brandId, onClose, onSuccess }) 
                                 onChange={handleChange}
                                 placeholder="e.g., Newsletter Subscribers"
                                 disabled={isLoading}
+                                className="form-input"
                             />
                         </div>
-                    </div>
 
-                    <div className="form-group">
-                        <label htmlFor="description">
-                            Description <span className="optional">(optional)</span>
-                        </label>
-                        <div className="input-wrapper">
+                        <div className="form-group">
+                            <label
+                                htmlFor="description"
+                                className="form-label"
+                            >
+                                Description <span className="form-optional">(optional)</span>
+                            </label>
                             <textarea
                                 id="description"
                                 name="description"
@@ -108,38 +114,39 @@ export default function CreateContactListModal({ brandId, onClose, onSuccess }) 
                                 placeholder="Describe the purpose of this contact list"
                                 disabled={isLoading}
                                 rows={3}
+                                className="form-textarea"
                             />
                         </div>
-                    </div>
 
-                    <div className="form-actions">
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={onClose}
-                            disabled={isLoading}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <Loader
-                                        size={16}
-                                        className="spinner"
-                                    />
-                                    Creating...
-                                </>
-                            ) : (
-                                'Create Contact List'
-                            )}
-                        </button>
-                    </div>
-                </form>
+                        <div className="form-actions">
+                            <button
+                                type="button"
+                                className="button button--secondary"
+                                onClick={onClose}
+                                disabled={isLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="button button--primary"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader
+                                            size={16}
+                                            className="spinner-icon"
+                                        />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    'Create Contact List'
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );
