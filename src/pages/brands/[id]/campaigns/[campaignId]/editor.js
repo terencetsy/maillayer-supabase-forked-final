@@ -240,10 +240,6 @@ export default function CampaignEditor() {
                 {/* Editor Container */}
                 <div
                     style={{
-                        background: '#fff',
-                        border: '1px solid #f0f0f0',
-                        borderRadius: '0.75rem',
-                        padding: '1.5rem',
                         minHeight: '500px',
                     }}
                 >
