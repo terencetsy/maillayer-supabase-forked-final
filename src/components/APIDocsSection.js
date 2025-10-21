@@ -85,7 +85,7 @@ print_r($result);
         <div className="api-docs-section">
             <div className="api-info-card">
                 <h3>Transactional Email API</h3>
-                <p>Use this API to send transactional emails with your template. You'll need to include your API key and provide values for all template variables.</p>
+                <p>Use this API to send transactional emails with your template. You&apos;ll need to include your API key and provide values for all template variables.</p>
 
                 <div className="api-endpoint">
                     <h4>Endpoint</h4>
@@ -149,7 +149,7 @@ print_r($result);
                                 <td>replyTo</td>
                                 <td>String</td>
                                 <td>No</td>
-                                <td>Reply-to email address (defaults to template's from email)</td>
+                                <td>Reply-to email address (defaults to template&apos;s from email)</td>
                             </tr>
                             <tr>
                                 <td>cc</td>

@@ -713,7 +713,7 @@ export default function GoogleSheetsIntegration() {
                                                     </li>
                                                     <li>Create a project or select an existing one</li>
                                                     <li>Enable the Google Sheets API for the project</li>
-                                                    <li>Create a service account with "Editor" permission</li>
+                                                    <li>Create a service account with &ldquo;Editor&ldquo; permission</li>
                                                     <li>Create a key for the service account (JSON format)</li>
                                                     <li>Download and upload the JSON file below</li>
                                                 </ol>

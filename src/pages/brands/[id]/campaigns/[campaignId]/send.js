@@ -671,7 +671,7 @@ export default function SendCampaign() {
                                     <>
                                         {contactLists.length === 0 ? (
                                             <div className="sc-empty">
-                                                <p>You don't have any contact lists with contacts.</p>
+                                                <p>You don&apos;t have any contact lists with contacts.</p>
                                                 <Link
                                                     href={`/brands/${id}/contacts`}
                                                     className="button button--primary button--small"

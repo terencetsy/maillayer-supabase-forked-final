@@ -658,7 +658,7 @@ export default function SupabaseIntegration() {
                                         <div className="instructions">
                                             <div className="instruction-note">
                                                 <Info size={16} />
-                                                <p>To get your Supabase API key, go to your Supabase project dashboard, navigate to Project Settings {`>`} API, and find your "anon" or "service_role" key.</p>
+                                                <p>To get your Supabase API key, go to your Supabase project dashboard, navigate to Project Settings {`>`} API, and find your &ldquo;anon&ldquo; or &ldquo;service_role&ldquo; key.</p>
                                             </div>
                                         </div>
 

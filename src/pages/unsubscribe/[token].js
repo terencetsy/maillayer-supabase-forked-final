@@ -103,7 +103,7 @@ export default function Unsubscribe() {
             <div className="unsubscribe-card">
                 {isUnsubscribed ? (
                     <div className="unsubscribe-success">
-                        <h1>You're Unsubscribed</h1>
+                        <h1>You&apos;re Unsubscribed</h1>
                         <p>You have been successfully unsubscribed from our mailing list.</p>
                         <p>Email: {email}</p>
                         {success && <p>Thank you for your feedback.</p>}
@@ -124,7 +124,7 @@ export default function Unsubscribe() {
                                     <option value="">Select a reason</option>
                                     <option value="too_many_emails">Too many emails</option>
                                     <option value="not_relevant">Content not relevant</option>
-                                    <option value="didnt_signup">I didn't sign up</option>
+                                    <option value="didnt_signup">I didn&apos;t sign up</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>

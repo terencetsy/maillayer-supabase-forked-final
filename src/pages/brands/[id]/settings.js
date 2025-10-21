@@ -480,7 +480,7 @@ export default function BrandSettings() {
                                 </button>
                             ) : (
                                 <div className="delete-confirm">
-                                    <p className="confirm-label">Type "{brand.name}" to confirm deletion:</p>
+                                    <p className="confirm-label">Type &ldquo;{brand.name}&ldquo; to confirm deletion:</p>
                                     <input
                                         type="text"
                                         value={deleteConfirmText}
