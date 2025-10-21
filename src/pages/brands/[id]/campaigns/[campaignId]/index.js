@@ -135,7 +135,7 @@ export default function CampaignDetail() {
 
     const fetchGeoStats = async () => {
         try {
-            const res = await fetch(`/api/brands/${id}/campaigns/${campaignId}/geo-stats`, {
+            const res = await fetch(`/api/brands/${id}/campaigns/${campaignId}/geostats`, {
                 credentials: 'same-origin',
             });
 
