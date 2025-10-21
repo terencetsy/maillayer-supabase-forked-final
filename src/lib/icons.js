@@ -383,3 +383,184 @@ export const PlusSign = (props) => (
         ></path>
     </svg>
 );
+
+export const Search01 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M17.5 17.5L22 22m-2-11a9 9 0 1 0-18 0a9 9 0 0 0 18 0"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const PlusSignCircle = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            color="currentColor"
+        >
+            <path d="M12 8v8m4-4H8"></path>
+            <circle
+                cx="12"
+                cy="12"
+                r="10"
+            ></circle>
+        </g>
+    </svg>
+);
+
+export const CheckmarkCircle02 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            color="currentColor"
+        >
+            <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12s4.477 10 10 10s10-4.477 10-10"></path>
+            <path d="M8 12.75s1.6.912 2.4 2.25c0 0 2.4-5.25 5.6-7"></path>
+        </g>
+    </svg>
+);
+
+export const AlertCircle = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            color="currentColor"
+        >
+            <circle
+                cx="12"
+                cy="12"
+                r="10"
+            ></circle>
+            <path d="M11.992 15h.009M12 12V8"></path>
+        </g>
+    </svg>
+);
+
+export const Clock01 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            color="currentColor"
+        >
+            <circle
+                cx="12"
+                cy="12"
+                r="10"
+            ></circle>
+            <path d="M12 8v4l2 2"></path>
+        </g>
+    </svg>
+);
+
+export const Sent02 = (props) => (
+    <svg
+        width="1em"
+        height="1em"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="m9.498 15l7.5-7.5m-8.992.179l7.321-3.46c3.042-1.438 4.563-2.157 5.533-1.436s.693 2.365.138 5.652l-.954 5.662c-.363 2.149-.544 3.223-1.345 3.692s-1.842.109-3.923-.611l-6.365-2.202c-3.892-1.346-5.838-2.019-5.91-3.34c-.074-1.32 1.786-2.2 5.505-3.957M9.498 15.5v2.227c0 2.374 0 3.56.71 3.75s1.458-.798 2.954-2.773l.836-1.204"
+        ></path>
+    </svg>
+);
+
+export const MouseLeftClick04 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            color="currentColor"
+        >
+            <path d="M13.5 6V2M12 7.5c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.54C12.801 6 13.034 6 13.5 6s.699 0 .883.076a1 1 0 0 1 .54.541c.077.184.077.417.077.883v2c0 .466 0 .699-.076.883a1 1 0 0 1-.541.54c-.184.077-.417.077-.883.077s-.699 0-.883-.076a1 1 0 0 1-.54-.541C12 10.199 12 9.966 12 9.5z"></path>
+            <path d="M13.5 22c6 0 7.5-4.51 7.5-10S19.5 2 13.5 2S6 6.51 6 12s1.5 10 7.5 10M5 2C3.945 3.132 3.235 4.501 3 6"></path>
+        </g>
+    </svg>
+);
+
+export const Message01 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M8.5 14.5h7m-7-5H12m2.17 11.39c4.184-.277 7.516-3.657 7.79-7.9c.053-.83.053-1.69 0-2.52c-.274-4.242-3.606-7.62-7.79-7.899a33 33 0 0 0-4.34 0c-4.184.278-7.516 3.657-7.79 7.9a20 20 0 0 0 0 2.52c.1 1.545.783 2.976 1.588 4.184c.467.845.159 1.9-.328 2.823c-.35.665-.526.997-.385 1.237c.14.24.455.248 1.084.263c1.245.03 2.084-.322 2.75-.813c.377-.279.566-.418.696-.434s.387.09.899.3c.46.19.995.307 1.485.34c1.425.094 2.914.094 4.342 0"
+            color="currentColor"
+        ></path>
+    </svg>
+);

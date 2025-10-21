@@ -36,6 +36,13 @@ export default function TemplateEditor() {
         }
     }, [status, id, templateId, router]);
 
+    // Detect variables and sync with editableVariables
+    useEffect(() => {
+        if (content || template) {
+            detectAndSyncVariables(content, template?.subject);
+        }
+    }, [content, template?.subject]);
+
     const fetchBrandDetails = async () => {
         try {
             const res = await fetch(`/api/brands/${id}`, {
@@ -78,7 +85,7 @@ export default function TemplateEditor() {
             const data = await res.json();
             setTemplate(data);
             setContent(data.content || getDefaultEmailTemplate());
-            if (data.variables) {
+            if (data.variables && data.variables.length > 0) {
                 setEditableVariables(data.variables);
             }
         } catch (error) {
@@ -89,26 +96,25 @@ export default function TemplateEditor() {
         }
     };
 
-    const handleContentChange = (newContent) => {
-        setContent(newContent);
-        // Clear any previous save messages
-        setSaveMessage('');
-
-        // Look for variables in the format [variableName]
+    // Detect variables and sync with editableVariables
+    const detectAndSyncVariables = (emailContent, subjectLine) => {
         const regex = /\[([\w\d_]+)\]/g;
         const variables = [];
         let match;
 
-        while ((match = regex.exec(newContent)) !== null) {
-            if (!variables.includes(match[1])) {
-                variables.push(match[1]);
+        // Look for variables in content
+        if (emailContent) {
+            while ((match = regex.exec(emailContent)) !== null) {
+                if (!variables.includes(match[1])) {
+                    variables.push(match[1]);
+                }
             }
         }
 
         // Also check the subject line if available
-        if (template && template.subject) {
+        if (subjectLine) {
             regex.lastIndex = 0; // Reset the regex
-            while ((match = regex.exec(template.subject)) !== null) {
+            while ((match = regex.exec(subjectLine)) !== null) {
                 if (!variables.includes(match[1])) {
                     variables.push(match[1]);
                 }
@@ -116,19 +122,13 @@ export default function TemplateEditor() {
         }
 
         setDetectedVariables(variables);
-    };
 
-    const handleSave = async () => {
-        try {
-            setIsSaving(true);
-            setSaveMessage('');
-            setError('');
+        // Sync with editableVariables
+        setEditableVariables((prevEditableVars) => {
+            const updatedVariables = [...prevEditableVars];
 
-            // Update variables based on newly detected ones
-            const updatedVariables = editableVariables.slice();
-
-            // Add any newly detected variables that don't exist yet
-            detectedVariables.forEach((varName) => {
+            // Add newly detected variables that don't exist yet
+            variables.forEach((varName) => {
                 if (!updatedVariables.some((v) => v.name === varName)) {
                     updatedVariables.push({
                         name: varName,
@@ -139,7 +139,24 @@ export default function TemplateEditor() {
             });
 
             // Remove variables that no longer exist in the content
-            const filteredVariables = updatedVariables.filter((v) => detectedVariables.includes(v.name));
+            const filteredVariables = updatedVariables.filter((v) => variables.includes(v.name));
+
+            return filteredVariables;
+        });
+    };
+
+    const handleContentChange = (newContent) => {
+        setContent(newContent);
+        // Clear any previous save messages
+        setSaveMessage('');
+        // Variables will be detected by the useEffect
+    };
+
+    const handleSave = async () => {
+        try {
+            setIsSaving(true);
+            setSaveMessage('');
+            setError('');
 
             const res = await fetch(`/api/brands/${id}/transactional/${templateId}`, {
                 method: 'PUT',
@@ -148,7 +165,7 @@ export default function TemplateEditor() {
                 },
                 body: JSON.stringify({
                     content: content,
-                    variables: filteredVariables,
+                    variables: editableVariables,
                 }),
                 credentials: 'same-origin',
             });
@@ -158,7 +175,6 @@ export default function TemplateEditor() {
             }
 
             setSaveMessage('Template saved successfully');
-            setEditableVariables(filteredVariables);
 
             // Clear success message after 3 seconds
             setTimeout(() => {
@@ -251,7 +267,7 @@ export default function TemplateEditor() {
                         {error && <div className="status-message error">{error}</div>}
 
                         <button
-                            className="btn-save"
+                            className="button button--secondary"
                             onClick={handleSave}
                             disabled={isSaving}
                         >
@@ -268,9 +284,17 @@ export default function TemplateEditor() {
                             )}
                         </button>
 
+                        <Link
+                            href={`/brands/${id}/transactional/${templateId}/api`}
+                            className="button button--secondary"
+                        >
+                            <Code size={16} />
+                            <span>API Documentation</span>
+                        </Link>
+
                         {template && template.status !== 'active' && (
                             <button
-                                className="btn-publish"
+                                className="button button--primary"
                                 onClick={handlePublish}
                                 disabled={isPublishing}
                             >
@@ -278,14 +302,6 @@ export default function TemplateEditor() {
                                 <span>{isPublishing ? 'Publishing...' : 'Publish'}</span>
                             </button>
                         )}
-
-                        <Link
-                            href={`/brands/${id}/transactional/${templateId}/api`}
-                            className="btn-api"
-                        >
-                            <Code size={16} />
-                            <span>API Documentation</span>
-                        </Link>
                     </div>
                 </div>
 
@@ -330,7 +346,7 @@ export default function TemplateEditor() {
                                     <tbody>
                                         {editableVariables.map((variable, index) => (
                                             <tr key={variable.name}>
-                                                <td>{variable.name}</td>
+                                                <td>[{variable.name}]</td>
                                                 <td>
                                                     <input
                                                         type="text"
@@ -364,7 +380,7 @@ export default function TemplateEditor() {
                             </div>
                             <div className="variables-actions">
                                 <button
-                                    className="btn-secondary"
+                                    className="button button--primary"
                                     onClick={() => setVariableEditMode(false)}
                                 >
                                     Done

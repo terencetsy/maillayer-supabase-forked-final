@@ -162,8 +162,6 @@ export default function BrandLayout({ children, brand }) {
                             {activeMenuItem === 'contacts' && 'Contacts'}
                             {activeMenuItem === 'contactsList' && ''}
                             {activeMenuItem === 'analytics' && 'Analytics'}
-                            {activeMenuItem === 'settings' && 'Settings'}
-                            {activeMenuItem === 'verification' && 'Verification'}
                         </h1>
                     </header>
 

@@ -125,7 +125,7 @@ export default function BrandIntegrations() {
                         <div className="integration-action">
                             <Link
                                 href={`/brands/${id}/integrations/firebase`}
-                                className="integration-button"
+                                className="button button--primary"
                             >
                                 {getIntegrationByType('firebase') ? 'Manage' : 'Connect'}
                                 <ArrowRight size={16} />
@@ -155,7 +155,7 @@ export default function BrandIntegrations() {
                         <div className="integration-action">
                             <Link
                                 href={`/brands/${id}/integrations/airtable`}
-                                className="integration-button"
+                                className="button button--primary"
                             >
                                 {getIntegrationByType('airtable') ? 'Manage' : 'Connect'}
                                 <ArrowRight size={16} />
@@ -185,7 +185,7 @@ export default function BrandIntegrations() {
                         <div className="integration-action">
                             <Link
                                 href={`/brands/${id}/integrations/google-sheets`}
-                                className="integration-button"
+                                className="button button--primary"
                             >
                                 {getIntegrationByType('google_sheets') ? 'Manage' : 'Connect'}
                                 <ArrowRight size={16} />
@@ -205,8 +205,8 @@ export default function BrandIntegrations() {
                             </div>
                         </div>
                         <div className="integration-action">
-                            <button className="integration-button disabled">
-                                Connect
+                            <button className="button button--secondary">
+                                Work in progress
                                 <ArrowRight size={16} />
                             </button>
                         </div>
@@ -223,9 +223,10 @@ export default function BrandIntegrations() {
                                 <div className="status-badge badge-default">Coming Soon</div>
                             </div>
                         </div>
+
                         <div className="integration-action">
-                            <button className="integration-button disabled">
-                                Connect
+                            <button className="button button--secondary">
+                                Work in progress
                                 <ArrowRight size={16} />
                             </button>
                         </div>
