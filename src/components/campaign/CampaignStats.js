@@ -32,6 +32,7 @@ export default function CampaignDetail() {
         browsers: [],
         operatingSystems: [],
         totalEvents: 0,
+        appliedFilter: null,
     });
     const [activeGeoTab, setActiveGeoTab] = useState('location');
     const [mapView, setMapView] = useState('countries');
@@ -167,6 +168,8 @@ export default function CampaignDetail() {
     const fetchGeoStats = async () => {
         try {
             setGeoLoading(true);
+
+            // Using the correct API route from the original GeoStats component
             let url = `/api/brands/${id}/campaigns/${campaignId}/geostats`;
             if (eventTypeFilter) {
                 url += `?eventType=${eventTypeFilter}`;
