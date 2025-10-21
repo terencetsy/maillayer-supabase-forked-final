@@ -35,6 +35,12 @@ export default function SendCampaign() {
     const [totalContacts, setTotalContacts] = useState(0);
     const [activeContactCounts, setActiveContactCounts] = useState({});
 
+    // Test email parameters
+    const [testEmail, setTestEmail] = useState('');
+    const [isSendingTest, setIsSendingTest] = useState(false);
+    const [testEmailSuccess, setTestEmailSuccess] = useState('');
+    const [testEmailError, setTestEmailError] = useState('');
+
     // Warmup parameters
     const [initialBatchSize, setInitialBatchSize] = useState(50);
     const [incrementFactor, setIncrementFactor] = useState(2);
@@ -57,6 +63,13 @@ export default function SendCampaign() {
             fetchContactLists();
         }
     }, [status, id, campaignId, router]);
+
+    // Set test email to user's email by default
+    useEffect(() => {
+        if (session?.user?.email) {
+            setTestEmail(session.user.email);
+        }
+    }, [session]);
 
     // Calculate total active contacts when selected lists change
     useEffect(() => {
@@ -176,7 +189,7 @@ export default function SendCampaign() {
         }
 
         setWarmupStages(stages);
-        setEstimatedWarmupDuration(cumulativeDays);
+        setEstimatedWarmupDuration(Math.ceil(cumulativeDays));
     };
 
     const fetchBrandDetails = async () => {
@@ -286,6 +299,46 @@ export default function SendCampaign() {
             setSelectedLists(selectedLists.filter((id) => id !== listId));
         } else {
             setSelectedLists([...selectedLists, listId]);
+        }
+    };
+
+    const handleSendTestEmail = async () => {
+        if (!testEmail) {
+            setTestEmailError('Please enter an email address');
+            return;
+        }
+
+        try {
+            setIsSendingTest(true);
+            setTestEmailError('');
+            setTestEmailSuccess('');
+
+            const res = await fetch(`/api/brands/${id}/campaigns/${campaignId}/test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: testEmail,
+                    fromName: brand.fromName,
+                    fromEmail: brand.fromEmail,
+                    replyTo: brand.replyToEmail,
+                }),
+                credentials: 'same-origin',
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.message || 'Failed to send test email');
+            }
+
+            setTestEmailSuccess('Test email sent successfully!');
+            setTimeout(() => setTestEmailSuccess(''), 3000);
+        } catch (error) {
+            console.error('Error sending test email:', error);
+            setTestEmailError(error.message);
+        } finally {
+            setIsSendingTest(false);
         }
     };
 
@@ -447,7 +500,7 @@ export default function SendCampaign() {
     const formatDate = (date) => {
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
-            month: 'long',
+            month: 'short',
             day: 'numeric',
         });
     };
@@ -479,308 +532,275 @@ export default function SendCampaign() {
 
                 {error && (
                     <div className="sc-alert sc-alert-error">
-                        <AlertCircle size={20} />
+                        <AlertCircle size={16} />
                         <span>{error}</span>
                     </div>
                 )}
 
                 {success && (
                     <div className="sc-alert sc-alert-success">
-                        <CheckCircle size={20} />
+                        <CheckCircle size={16} />
                         <span>{success}</span>
                     </div>
                 )}
 
-                <div className="sc-card">
-                    <div className="sc-card-header">
-                        <Mail size={18} />
-                        <h2>Campaign Details</h2>
+                {!isBrandReadyToSend() && (
+                    <div className="sc-verification-alert">
+                        <AlertCircle size={16} />
+                        <span>{brand.status === 'pending_setup' ? 'You need to complete brand setup before sending campaigns.' : 'Your brand is pending verification. Please verify your domain and email sending settings first.'}</span>
                     </div>
-                    <div className="sc-card-content">
-                        <div className="sc-detail-row">
-                            <div className="sc-detail-label">Name:</div>
-                            <div className="sc-detail-value">{campaign.name}</div>
-                        </div>
-                        <div className="sc-detail-row">
-                            <div className="sc-detail-label">Subject:</div>
-                            <div className="sc-detail-value">{campaign.subject}</div>
-                        </div>
-                        <div className="sc-detail-row">
-                            <div className="sc-detail-label">From:</div>
-                            <div className="sc-detail-value">
-                                {campaign.fromName || brand.name} &lt;{campaign.fromEmail || brand.fromEmail || 'Not set'}&gt;
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                )}
 
-                <div className="sc-card">
-                    <div className="sc-card-header">
-                        <Mail size={18} />
-                        <h2>Email Preview</h2>
-                    </div>
-                    <div className="sc-card-content">
-                        <div
-                            className="sc-email-preview"
-                            dangerouslySetInnerHTML={{ __html: campaign.content || '<p>No content yet. Go back and edit your campaign to add content.</p>' }}
-                        ></div>
-                    </div>
-                </div>
-
-                <div className="sc-card">
-                    <div className="sc-card-header">
-                        <Users size={18} />
-                        <h2>Select Recipients</h2>
-                    </div>
-                    <div className="sc-card-content">
-                        {isLoadingLists ? (
-                            <div className="sc-loading">
-                                <div className="sc-spinner"></div>
-                                <p>Loading contact lists...</p>
+                {/* Main Two-Column Layout */}
+                <div className="sc-main-layout">
+                    {/* LEFT COLUMN - PREVIEW */}
+                    <div className="sc-preview-column">
+                        {/* Campaign Details & Preview Card */}
+                        <div className="sc-card sc-card-compact sc-sticky">
+                            <div className="sc-card-header">
+                                <Mail size={16} />
+                                <h2>Campaign Preview</h2>
                             </div>
-                        ) : (
-                            <>
-                                {contactLists.length === 0 ? (
-                                    <div className="sc-empty">
-                                        <p>You don't have any contact lists with contacts. Please create a contact list and add contacts first.</p>
-                                        <Link
-                                            href={`/brands/${id}/contacts`}
-                                            className="sc-btn sc-btn-primary"
+
+                            {/* Campaign Details */}
+                            <div className="sc-card-content">
+                                <div className="sc-details-grid">
+                                    <div className="sc-detail-item">
+                                        <span className="sc-detail-label">Name</span>
+                                        <span className="sc-detail-value">{campaign.name}</span>
+                                    </div>
+                                    <div className="sc-detail-item">
+                                        <span className="sc-detail-label">Subject</span>
+                                        <span className="sc-detail-value">{campaign.subject}</span>
+                                    </div>
+                                    <div className="sc-detail-item">
+                                        <span className="sc-detail-label">From</span>
+                                        <span className="sc-detail-value">
+                                            {campaign.fromName || brand.name} &lt;{campaign.fromEmail || brand.fromEmail || 'Not set'}&gt;
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Email Preview */}
+                            <div
+                                className="sc-card-content"
+                                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid oklch(0.95 0 0)' }}
+                            >
+                                <div className="sc-preview-wrapper">
+                                    <div className="sc-preview-label">Email Content</div>
+                                    <div
+                                        className="sc-email-preview"
+                                        dangerouslySetInnerHTML={{
+                                            __html: campaign.content || '<p style="color: #999;">No content yet. Go back and edit your campaign to add content.</p>',
+                                        }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            {/* Test Email Section */}
+                            <div
+                                className="sc-card-content"
+                                style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid oklch(0.95 0 0)' }}
+                            >
+                                <div className="sc-test-email-section">
+                                    <div className="sc-test-email-header">
+                                        <span className="sc-preview-label">Send Test Email</span>
+                                        {testEmailSuccess && (
+                                            <span className="sc-test-success">
+                                                <CheckCircle size={14} />
+                                                Sent!
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {testEmailError && (
+                                        <div className="sc-test-error">
+                                            <AlertCircle size={14} />
+                                            <span>{testEmailError}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="sc-test-email-form">
+                                        <input
+                                            type="email"
+                                            className="form-input form-input--small"
+                                            placeholder="your@email.com"
+                                            value={testEmail}
+                                            onChange={(e) => setTestEmail(e.target.value)}
+                                        />
+                                        <button
+                                            className="button button--small button--secondary"
+                                            onClick={handleSendTestEmail}
+                                            disabled={isSendingTest || !testEmail}
                                         >
-                                            Create Contact List
-                                        </Link>
+                                            {isSendingTest ? (
+                                                <>
+                                                    <span className="spinner-icon">⟳</span>
+                                                    <span>Sending...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send size={14} />
+                                                    <span>Send Test</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                    <p className="sc-test-help">Test emails help you verify how your campaign looks before sending to all recipients.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN - OPTIONS */}
+                    <div className="sc-options-column">
+                        {/* Recipients Card */}
+                        <div className="sc-card sc-card-compact">
+                            <div className="sc-card-header">
+                                <Users size={16} />
+                                <h2>Recipients</h2>
+                            </div>
+                            <div className="sc-card-content">
+                                {isLoadingLists ? (
+                                    <div className="sc-loading">
+                                        <div className="sc-spinner"></div>
+                                        <p>Loading contact lists...</p>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="sc-lists">
-                                            {contactLists.map((list) => (
-                                                <div
-                                                    key={list._id}
-                                                    className={`sc-list-item ${selectedLists.includes(list._id) ? 'sc-selected' : ''}`}
-                                                    onClick={() => handleToggleList(list._id)}
+                                        {contactLists.length === 0 ? (
+                                            <div className="sc-empty">
+                                                <p>You don't have any contact lists with contacts.</p>
+                                                <Link
+                                                    href={`/brands/${id}/contacts`}
+                                                    className="button button--primary button--small"
                                                 >
-                                                    <div className="sc-checkbox">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedLists.includes(list._id)}
-                                                            onChange={() => {}}
-                                                            id={`list-${list._id}`}
-                                                        />
-                                                    </div>
-                                                    <div className="sc-list-info">
-                                                        <h4>{list.name}</h4>
-                                                        <p>
-                                                            {activeContactCounts[list._id] || 0} active contacts
-                                                            {list.contactCount > (activeContactCounts[list._id] || 0) && ` (${list.contactCount} total)`}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {selectedLists.length > 0 && (
-                                            <div className="sc-summary">
-                                                <Users size={16} />
-                                                <span>
-                                                    Sending to <strong>{totalContacts}</strong> active contacts across {selectedLists.length} list{selectedLists.length !== 1 ? 's' : ''}
-                                                </span>
+                                                    Create Contact List
+                                                </Link>
                                             </div>
+                                        ) : (
+                                            <>
+                                                <div className="sc-lists">
+                                                    {contactLists.map((list) => (
+                                                        <label
+                                                            key={list._id}
+                                                            className={`sc-list-item ${selectedLists.includes(list._id) ? 'sc-selected' : ''}`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedLists.includes(list._id)}
+                                                                onChange={() => handleToggleList(list._id)}
+                                                                className="form-checkbox"
+                                                            />
+                                                            <div className="sc-list-info">
+                                                                <span className="sc-list-name">{list.name}</span>
+                                                                <span className="sc-list-count">
+                                                                    {activeContactCounts[list._id] || 0} active
+                                                                    {list.contactCount > (activeContactCounts[list._id] || 0) && ` (${list.contactCount} total)`}
+                                                                </span>
+                                                            </div>
+                                                        </label>
+                                                    ))}
+                                                </div>
+
+                                                {selectedLists.length > 0 && (
+                                                    <div className="sc-summary">
+                                                        <Users size={14} />
+                                                        <span>
+                                                            <strong>{totalContacts}</strong> active contacts in {selectedLists.length} list
+                                                            {selectedLists.length !== 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </>
                                 )}
-                            </>
-                        )}
-                    </div>
-                </div>
-
-                <div className="sc-card">
-                    <div className="sc-card-header">
-                        <Calendar size={18} />
-                        <h2>Choose When to Send</h2>
-                    </div>
-                    <div className="sc-card-content">
-                        <div className="sc-schedule-options">
-                            {/* Send Now Option */}
-                            <div
-                                className={`sc-option ${scheduleType === 'send_now' ? 'sc-selected' : ''}`}
-                                onClick={() => setScheduleType('send_now')}
-                            >
-                                <div className="sc-radio">
-                                    <input
-                                        type="radio"
-                                        checked={scheduleType === 'send_now'}
-                                        onChange={() => {}}
-                                        id="send-now"
-                                    />
-                                </div>
-                                <div className="sc-option-content">
-                                    <Send size={18} />
-                                    <div className="sc-option-info">
-                                        <h4>Send Now</h4>
-                                        <p>Your campaign will be sent immediately</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Schedule for Later Option */}
-                            <div
-                                className={`sc-option ${scheduleType === 'schedule' ? 'sc-selected' : ''}`}
-                                onClick={() => setScheduleType('schedule')}
-                            >
-                                <div className="sc-radio">
-                                    <input
-                                        type="radio"
-                                        checked={scheduleType === 'schedule'}
-                                        onChange={() => {}}
-                                        id="schedule"
-                                    />
-                                </div>
-                                <div className="sc-option-content">
-                                    <Calendar size={18} />
-                                    <div className="sc-option-info">
-                                        <h4>Schedule for Later</h4>
-                                        <p>Select a date and time to send this campaign</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Domain Warmup Option - New */}
-                            <div
-                                className={`sc-option ${scheduleType === 'warmup' ? 'sc-selected' : ''}`}
-                                onClick={() => setScheduleType('warmup')}
-                            >
-                                <div className="sc-radio">
-                                    <input
-                                        type="radio"
-                                        checked={scheduleType === 'warmup'}
-                                        onChange={() => {}}
-                                        id="warmup"
-                                    />
-                                </div>
-                                <div className="sc-option-content">
-                                    <Droplet size={18} />
-                                    <div className="sc-option-info">
-                                        <h4>Domain Warmup</h4>
-                                        <p>Gradually send over time to warm up your domain reputation</p>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
-                        {/* Schedule Options */}
-                        {scheduleType === 'schedule' && (
-                            <div className="date-time-selection">
-                                <div className="date-picker-wrapper">
-                                    <label>Date</label>
-                                    <DatePicker
-                                        selected={scheduledDate}
-                                        onChange={(date) => setScheduledDate(date)}
-                                        minDate={new Date()}
-                                        className="date-picker"
-                                    />
-                                </div>
-                                <div className="time-picker-wrapper">
-                                    <label>Time</label>
-                                    <DatePicker
-                                        selected={scheduledTime}
-                                        onChange={(time) => setScheduledTime(time)}
-                                        showTimeSelect
-                                        showTimeSelectOnly
-                                        timeIntervals={15}
-                                        timeCaption="Time"
-                                        dateFormat="h:mm aa"
-                                        className="time-picker"
-                                    />
-                                </div>
+                        {/* Send Options Card */}
+                        <div className="sc-card sc-card-compact">
+                            <div className="sc-card-header">
+                                <Calendar size={16} />
+                                <h2>Send Options</h2>
                             </div>
-                        )}
+                            <div className="sc-card-content">
+                                <div className="sc-schedule-options">
+                                    {/* Send Now Option */}
+                                    <label className={`sc-option ${scheduleType === 'send_now' ? 'sc-selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="scheduleType"
+                                            checked={scheduleType === 'send_now'}
+                                            onChange={() => setScheduleType('send_now')}
+                                            className="form-radio"
+                                        />
+                                        <div className="sc-option-content">
+                                            <Send size={16} />
+                                            <div className="sc-option-info">
+                                                <span className="sc-option-title">Send Now</span>
+                                                <span className="sc-option-desc">Send immediately to all recipients</span>
+                                            </div>
+                                        </div>
+                                    </label>
 
-                        {/* Warmup Options - New */}
-                        {scheduleType === 'warmup' && (
-                            <div className="sc-warmup-options">
-                                <div className="sc-warmup-info">
-                                    <div className="sc-info-box">
-                                        <Info size={16} />
-                                        <span>Domain warmup helps establish sender reputation by gradually increasing email volume over time. This improves deliverability and reduces the chance of being marked as spam.</span>
-                                    </div>
+                                    {/* Schedule for Later Option */}
+                                    <label className={`sc-option ${scheduleType === 'schedule' ? 'sc-selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="scheduleType"
+                                            checked={scheduleType === 'schedule'}
+                                            onChange={() => setScheduleType('schedule')}
+                                            className="form-radio"
+                                        />
+                                        <div className="sc-option-content">
+                                            <Calendar size={16} />
+                                            <div className="sc-option-info">
+                                                <span className="sc-option-title">Schedule for Later</span>
+                                                <span className="sc-option-desc">Choose a specific date and time</span>
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    {/* Domain Warmup Option */}
+                                    <label className={`sc-option ${scheduleType === 'warmup' ? 'sc-selected' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="scheduleType"
+                                            checked={scheduleType === 'warmup'}
+                                            onChange={() => setScheduleType('warmup')}
+                                            className="form-radio"
+                                        />
+                                        <div className="sc-option-content">
+                                            <Droplet size={16} />
+                                            <div className="sc-option-info">
+                                                <span className="sc-option-title">Domain Warmup</span>
+                                                <span className="sc-option-desc">Gradually increase sending volume</span>
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
 
-                                <div className="sc-warmup-config">
-                                    <h4>Warmup Configuration</h4>
-
-                                    <div className="sc-warmup-form">
-                                        <div className="sc-form-row">
-                                            <div className="sc-form-group">
-                                                <label htmlFor="initialBatchSize">Initial Batch Size</label>
-                                                <input
-                                                    id="initialBatchSize"
-                                                    type="number"
-                                                    value={initialBatchSize}
-                                                    onChange={(e) => setInitialBatchSize(Math.max(1, parseInt(e.target.value)))}
-                                                    min="1"
-                                                    className="sc-form-input"
-                                                />
-                                                <div className="sc-form-help">Number of emails in the first batch</div>
-                                            </div>
-
-                                            <div className="sc-form-group">
-                                                <label htmlFor="incrementFactor">Growth Factor</label>
-                                                <input
-                                                    id="incrementFactor"
-                                                    type="number"
-                                                    value={incrementFactor}
-                                                    onChange={(e) => setIncrementFactor(Math.max(1.1, parseFloat(e.target.value)))}
-                                                    step="0.1"
-                                                    min="1.1"
-                                                    className="sc-form-input"
-                                                />
-                                                <div className="sc-form-help">Multiply batch size by this factor each step (e.g., 2 = double)</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="sc-form-row">
-                                            <div className="sc-form-group">
-                                                <label htmlFor="incrementInterval">Interval (hours)</label>
-                                                <input
-                                                    id="incrementInterval"
-                                                    type="number"
-                                                    value={incrementInterval}
-                                                    onChange={(e) => setIncrementInterval(Math.max(1, parseInt(e.target.value)))}
-                                                    min="1"
-                                                    className="sc-form-input"
-                                                />
-                                                <div className="sc-form-help">Hours between each batch (24 = daily)</div>
-                                            </div>
-
-                                            <div className="sc-form-group">
-                                                <label htmlFor="maxBatchSize">Maximum Batch Size</label>
-                                                <input
-                                                    id="maxBatchSize"
-                                                    type="number"
-                                                    value={maxBatchSize}
-                                                    onChange={(e) => setMaxBatchSize(Math.max(initialBatchSize, parseInt(e.target.value)))}
-                                                    min={initialBatchSize}
-                                                    className="sc-form-input"
-                                                />
-                                                <div className="sc-form-help">Maximum emails per batch</div>
-                                            </div>
-                                        </div>
-
+                                {/* Schedule Options */}
+                                {scheduleType === 'schedule' && (
+                                    <div className="sc-schedule-config">
                                         <div className="date-time-selection">
                                             <div className="date-picker-wrapper">
-                                                <label>Start Date</label>
+                                                <label>Date</label>
                                                 <DatePicker
-                                                    selected={warmupStartDate}
-                                                    onChange={(date) => setWarmupStartDate(date)}
+                                                    selected={scheduledDate}
+                                                    onChange={(date) => setScheduledDate(date)}
                                                     minDate={new Date()}
                                                     className="date-picker"
                                                 />
                                             </div>
                                             <div className="time-picker-wrapper">
-                                                <label>Start Time</label>
+                                                <label>Time</label>
                                                 <DatePicker
-                                                    selected={warmupStartTime}
-                                                    onChange={(time) => setWarmupStartTime(time)}
+                                                    selected={scheduledTime}
+                                                    onChange={(time) => setScheduledTime(time)}
                                                     showTimeSelect
                                                     showTimeSelectOnly
                                                     timeIntervals={15}
@@ -791,99 +811,169 @@ export default function SendCampaign() {
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                {warmupStages.length > 0 && (
-                                    <div className="sc-warmup-schedule">
-                                        <h4>Estimated Warmup Schedule</h4>
+                                {/* Warmup Options */}
+                                {scheduleType === 'warmup' && (
+                                    <div className="sc-warmup-options">
+                                        <div className="sc-info-box">
+                                            <Info size={14} />
+                                            <span>Domain warmup gradually increases email volume to build sender reputation and improve deliverability.</span>
+                                        </div>
 
-                                        <div className="sc-warmup-summary">
-                                            <div className="sc-warmup-stat">
-                                                <span className="sc-stat-label">Total Contacts</span>
-                                                <span className="sc-stat-value">{formatNumber(totalContacts)}</span>
-                                            </div>
-                                            <div className="sc-warmup-stat">
-                                                <span className="sc-stat-label">Estimated Duration</span>
-                                                <span className="sc-stat-value">{estimatedWarmupDuration} days</span>
-                                            </div>
-                                            <div className="sc-warmup-stat">
-                                                <span className="sc-stat-label">Total Batches</span>
-                                                <span className="sc-stat-value">{warmupStages.length}</span>
+                                        <div className="sc-warmup-config">
+                                            <div className="sc-warmup-form">
+                                                <div className="sc-form-row">
+                                                    <div className="form-group">
+                                                        <label className="form-label">Initial Batch</label>
+                                                        <input
+                                                            type="number"
+                                                            value={initialBatchSize}
+                                                            onChange={(e) => setInitialBatchSize(Math.max(1, parseInt(e.target.value)))}
+                                                            min="1"
+                                                            className="form-input"
+                                                        />
+                                                    </div>
+
+                                                    <div className="form-group">
+                                                        <label className="form-label">Growth Factor</label>
+                                                        <input
+                                                            type="number"
+                                                            value={incrementFactor}
+                                                            onChange={(e) => setIncrementFactor(Math.max(1.1, parseFloat(e.target.value)))}
+                                                            step="0.1"
+                                                            min="1.1"
+                                                            className="form-input"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="sc-form-row">
+                                                    <div className="form-group">
+                                                        <label className="form-label">Interval (hours)</label>
+                                                        <input
+                                                            type="number"
+                                                            value={incrementInterval}
+                                                            onChange={(e) => setIncrementInterval(Math.max(1, parseInt(e.target.value)))}
+                                                            min="1"
+                                                            className="form-input"
+                                                        />
+                                                    </div>
+
+                                                    <div className="form-group">
+                                                        <label className="form-label">Max Batch</label>
+                                                        <input
+                                                            type="number"
+                                                            value={maxBatchSize}
+                                                            onChange={(e) => setMaxBatchSize(Math.max(initialBatchSize, parseInt(e.target.value)))}
+                                                            min={initialBatchSize}
+                                                            className="form-input"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="date-time-selection">
+                                                    <div className="date-picker-wrapper">
+                                                        <label>Start Date</label>
+                                                        <DatePicker
+                                                            selected={warmupStartDate}
+                                                            onChange={(date) => setWarmupStartDate(date)}
+                                                            minDate={new Date()}
+                                                            className="date-picker"
+                                                        />
+                                                    </div>
+                                                    <div className="time-picker-wrapper">
+                                                        <label>Start Time</label>
+                                                        <DatePicker
+                                                            selected={warmupStartTime}
+                                                            onChange={(time) => setWarmupStartTime(time)}
+                                                            showTimeSelect
+                                                            showTimeSelectOnly
+                                                            timeIntervals={15}
+                                                            timeCaption="Time"
+                                                            dateFormat="h:mm aa"
+                                                            className="time-picker"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="sc-warmup-stages-container">
-                                            <div className="sc-warmup-stages-header">
-                                                <div className="sc-stage-header">Stage</div>
-                                                <div className="sc-stage-header">Date</div>
-                                                <div className="sc-stage-header">Batch Size</div>
-                                                <div className="sc-stage-header">Total Sent</div>
-                                            </div>
-
-                                            <div className="sc-warmup-stages">
-                                                {warmupStages.slice(0, 5).map((stage) => (
-                                                    <div
-                                                        key={stage.stage}
-                                                        className="sc-warmup-stage"
-                                                    >
-                                                        <div className="sc-stage-cell">#{stage.stage + 1}</div>
-                                                        <div className="sc-stage-cell">{formatDate(stage.date)}</div>
-                                                        <div className="sc-stage-cell">{formatNumber(stage.batchSize)}</div>
-                                                        <div className="sc-stage-cell">{formatNumber(stage.totalSent)}</div>
+                                        {warmupStages.length > 0 && (
+                                            <div className="sc-warmup-schedule">
+                                                <div className="sc-warmup-summary">
+                                                    <div className="sc-warmup-stat">
+                                                        <span className="sc-stat-value">{formatNumber(totalContacts)}</span>
+                                                        <span className="sc-stat-label">Total Contacts</span>
                                                     </div>
-                                                ))}
-
-                                                {warmupStages.length > 5 && <div className="sc-warmup-more">{warmupStages.length - 5} more stages...</div>}
-
-                                                {warmupStages.length > 5 && (
-                                                    <div className="sc-warmup-stage">
-                                                        <div className="sc-stage-cell">#{warmupStages[warmupStages.length - 1].stage + 1}</div>
-                                                        <div className="sc-stage-cell">{formatDate(warmupStages[warmupStages.length - 1].date)}</div>
-                                                        <div className="sc-stage-cell">{formatNumber(warmupStages[warmupStages.length - 1].batchSize)}</div>
-                                                        <div className="sc-stage-cell">{formatNumber(warmupStages[warmupStages.length - 1].totalSent)}</div>
+                                                    <div className="sc-warmup-stat">
+                                                        <span className="sc-stat-value">{estimatedWarmupDuration}d</span>
+                                                        <span className="sc-stat-label">Duration</span>
                                                     </div>
-                                                )}
+                                                    <div className="sc-warmup-stat">
+                                                        <span className="sc-stat-value">{warmupStages.length}</span>
+                                                        <span className="sc-stat-label">Batches</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="sc-warmup-stages-container">
+                                                    <div className="sc-warmup-stages-header">
+                                                        <span>Stage</span>
+                                                        <span>Date</span>
+                                                        <span>Size</span>
+                                                        <span>Total</span>
+                                                    </div>
+
+                                                    <div className="sc-warmup-stages">
+                                                        {warmupStages.slice(0, 4).map((stage) => (
+                                                            <div
+                                                                key={stage.stage}
+                                                                className="sc-warmup-stage"
+                                                            >
+                                                                <span>#{stage.stage + 1}</span>
+                                                                <span>{formatDate(stage.date)}</span>
+                                                                <span>{formatNumber(stage.batchSize)}</span>
+                                                                <span>{formatNumber(stage.totalSent)}</span>
+                                                            </div>
+                                                        ))}
+
+                                                        {warmupStages.length > 4 && <div className="sc-warmup-more">+{warmupStages.length - 4} more stages</div>}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
+
+                        <div className="sc-actions">
+                            <Link
+                                href={`/brands/${id}/campaigns/${campaignId}`}
+                                className="sc-btn sc-btn-cancel"
+                            >
+                                Cancel
+                            </Link>
+
+                            <button
+                                className="sc-btn sc-btn-send"
+                                onClick={handleSendButtonClick}
+                                disabled={isSending || selectedLists.length === 0 || totalContacts === 0 || !isBrandReadyToSend()}
+                            >
+                                {isSending ? (
+                                    <>
+                                        <div className="sc-spinner-btn"></div>
+                                        <span>Processing...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        {scheduleType === 'warmup' ? <Droplet size={18} /> : <Send size={18} />}
+                                        <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : scheduleType === 'schedule' ? 'Schedule Campaign' : 'Start Domain Warmup'}</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
-                </div>
-
-                {!isBrandReadyToSend() && (
-                    <div className="sc-verification-alert">
-                        <AlertCircle size={16} />
-                        <span>{brand.status === 'pending_setup' ? 'You need to complete brand setup before sending campaigns.' : 'Your brand is pending verification. Please verify your domain and email sending settings first.'}</span>
-                    </div>
-                )}
-
-                <div className="sc-actions">
-                    <Link
-                        href={`/brands/${id}/campaigns/${campaignId}`}
-                        className="sc-btn sc-btn-cancel"
-                    >
-                        Cancel
-                    </Link>
-
-                    <button
-                        className="sc-btn sc-btn-send"
-                        onClick={handleSendButtonClick}
-                        disabled={isSending || selectedLists.length === 0 || totalContacts === 0 || !isBrandReadyToSend()}
-                    >
-                        {isSending ? (
-                            <>
-                                <div className="sc-spinner-btn"></div>
-                                <span>Processing...</span>
-                            </>
-                        ) : (
-                            <>
-                                {scheduleType === 'warmup' ? <Droplet size={18} /> : <Send size={18} />}
-                                <span>{scheduleType === 'send_now' ? 'Send Campaign Now' : scheduleType === 'schedule' ? 'Schedule Campaign' : 'Start Domain Warmup'}</span>
-                            </>
-                        )}
-                    </button>
                 </div>
             </div>
 
