@@ -100,32 +100,16 @@ export default function BrandCampaigns() {
     };
 
     const fetchCampaignsStats = async (campaignsList) => {
-        if (!Array.isArray(campaignsList)) {
-            console.error('Invalid campaigns list provided to fetchCampaignsStats');
-            return;
-        }
-
         // Filter campaigns that need stats (not draft or scheduled)
-        const campaignsNeedingStats = campaignsList.filter((campaign) => campaign && campaign.status !== 'draft' && campaign.status !== 'scheduled');
+        const campaignsNeedingStats = campaignsList.filter((campaign) => campaign.status !== 'draft' && campaign.status !== 'scheduled');
 
-        // Fetch all stats in parallel instead of sequentially
-        await Promise.all(
-            campaignsNeedingStats.map((campaign) => {
-                if (campaign && campaign._id) {
-                    return fetchCampaignStats(campaign._id);
-                }
-                return Promise.resolve();
-            })
-        );
+        // Fetch stats for each campaign progressively
+        for (const campaign of campaignsNeedingStats) {
+            fetchCampaignStats(campaign._id);
+        }
     };
 
     const fetchCampaignStats = async (campaignId) => {
-        // Validate campaignId
-        if (!campaignId) {
-            console.error('Invalid campaignId provided to fetchCampaignStats');
-            return;
-        }
-
         // Skip if already loading or loaded
         if (loadingStats[campaignId] || campaignStats[campaignId]) {
             return;
@@ -139,13 +123,12 @@ export default function BrandCampaigns() {
             });
 
             if (!res.ok) {
-                console.warn(`Failed to fetch stats for campaign ${campaignId}`);
-                return;
+                throw new Error('Failed to fetch campaign stats');
             }
 
             const data = await res.json();
 
-            if (data && data.statistics) {
+            if (data.statistics) {
                 setCampaignStats((prev) => ({
                     ...prev,
                     [campaignId]: data.statistics,
