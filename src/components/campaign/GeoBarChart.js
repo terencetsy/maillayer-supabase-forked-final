@@ -77,33 +77,33 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
         return String.fromCodePoint(...codePoints);
     };
 
-    // Generate colorful gradient for each bar
+    // Generate colorful gradient for each bar - using darker/brighter colors
     const getBarColor = (index, totalBars, isHovered) => {
-        // Array of vibrant color gradients
+        // Array of darker, more vibrant color gradients
         const colorGradients = [
-            'linear-gradient(180deg, #667eea 0%, #764ba2 100%)', // Purple-blue
-            'linear-gradient(180deg, #f093fb 0%, #f5576c 100%)', // Pink-red
-            'linear-gradient(180deg, #4facfe 0%, #00f2fe 100%)', // Blue-cyan
-            'linear-gradient(180deg, #43e97b 0%, #38f9d7 100%)', // Green-teal
-            'linear-gradient(180deg, #fa709a 0%, #fee140 100%)', // Pink-yellow
-            'linear-gradient(180deg, #30cfd0 0%, #330867 100%)', // Cyan-purple
-            'linear-gradient(180deg, #a8edea 0%, #fed6e3 100%)', // Mint-pink
-            'linear-gradient(180deg, #ff9a56 0%, #ff6a88 100%)', // Orange-pink
-            'linear-gradient(180deg, #ffecd2 0%, #fcb69f 100%)', // Peach
-            'linear-gradient(180deg, #ff6e7f 0%, #bfe9ff 100%)', // Red-blue
-            'linear-gradient(180deg, #e0c3fc 0%, #8ec5fc 100%)', // Lavender-blue
-            'linear-gradient(180deg, #f7971e 0%, #ffd200 100%)', // Orange-yellow
-            'linear-gradient(180deg, #00c6ff 0%, #0072ff 100%)', // Cyan-blue
-            'linear-gradient(180deg, #f857a6 0%, #ff5858 100%)', // Magenta-red
-            'linear-gradient(180deg, #11998e 0%, #38ef7d 100%)', // Teal-green
+            'linear-gradient(180deg, #0a0a0a 0%, #2a2a2a 100%)', // Dark black-gray
+            'linear-gradient(180deg, #1a1a1a 0%, #3a3a3a 100%)', // Darker gray
+            'linear-gradient(180deg, #0f0f0f 0%, #2f2f2f 100%)', // Deep black-gray
+            'linear-gradient(180deg, #151515 0%, #353535 100%)', // Charcoal
+            'linear-gradient(180deg, #0d0d0d 0%, #2d2d2d 100%)', // Dark slate
+            'linear-gradient(180deg, #121212 0%, #323232 100%)', // Midnight
+            'linear-gradient(180deg, #181818 0%, #383838 100%)', // Onyx
+            'linear-gradient(180deg, #0e0e0e 0%, #2e2e2e 100%)', // Ebony
+            'linear-gradient(180deg, #161616 0%, #363636 100%)', // Carbon
+            'linear-gradient(180deg, #0b0b0b 0%, #2b2b2b 100%)', // Obsidian
+            'linear-gradient(180deg, #131313 0%, #333333 100%)', // Jet
+            'linear-gradient(180deg, #191919 0%, #393939 100%)', // Raven
+            'linear-gradient(180deg, #0c0c0c 0%, #2c2c2c 100%)', // Coal
+            'linear-gradient(180deg, #141414 0%, #343434 100%)', // Shadow
+            'linear-gradient(180deg, #171717 0%, #373737 100%)', // Graphite
         ];
 
         const colorIndex = index % colorGradients.length;
         const gradient = colorGradients[colorIndex];
 
-        // If hovered, make it slightly lighter/brighter
+        // If hovered, make it slightly lighter
         if (isHovered) {
-            return gradient.replace(/180deg/g, '180deg').replace(/100%\)/g, '100%)');
+            return gradient.replace(/#0a/g, '#1a').replace(/#0b/g, '#1b').replace(/#0c/g, '#1c').replace(/#0d/g, '#1d').replace(/#0e/g, '#1e').replace(/#0f/g, '#1f').replace(/#1a/g, '#2a').replace(/#2a/g, '#3a');
         }
 
         return gradient;
@@ -146,7 +146,7 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
                     justifyContent: 'flex-start',
                     gap: '8px',
                     minHeight: '320px',
-                    padding: '20px 0 60px 0',
+                    padding: '20px 0 20px 0',
                     position: 'relative',
                     borderBottom: '1px solid #f0f0f0',
                     overflowX: 'auto',
@@ -172,22 +172,6 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
                             onMouseEnter={() => setHoveredIndex(index)}
                             onMouseLeave={() => setHoveredIndex(null)}
                         >
-                            {/* Flag (only for countries) */}
-                            {type === 'countries' && (
-                                <div
-                                    style={{
-                                        height: '28px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        marginBottom: '4px',
-                                        fontSize: '24px',
-                                    }}
-                                >
-                                    {getCountryFlag(item.date)}
-                                </div>
-                            )}
-
                             {/* Bar Wrapper */}
                             <div
                                 style={{
@@ -196,7 +180,7 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
                                     flexDirection: 'column',
                                     alignItems: 'center',
                                     justifyContent: 'flex-end',
-                                    height: type === 'countries' ? '200px' : '228px',
+                                    height: '228px',
                                     position: 'relative',
                                 }}
                             >
@@ -278,10 +262,10 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
                                 </div>
                             </div>
 
-                            {/* Label (Country/City/Device name) - Always show */}
+                            {/* Label (Country/City/Device name) - At bottom, no rotation */}
                             <div
                                 style={{
-                                    fontSize: '10px',
+                                    fontSize: '11px',
                                     color: isHovered ? '#1a1a1a' : '#666',
                                     fontWeight: isHovered ? '600' : '500',
                                     whiteSpace: 'nowrap',
@@ -289,11 +273,7 @@ export default function GeoBarChart({ data = [], title = 'Data', totalLabel = 'T
                                     textOverflow: 'ellipsis',
                                     maxWidth: '70px',
                                     textAlign: 'center',
-                                    position: 'absolute',
-                                    bottom: '-50px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%) rotate(-45deg)',
-                                    transformOrigin: 'center center',
+                                    marginTop: '8px',
                                     transition: 'all 0.2s ease',
                                 }}
                                 title={item.date}

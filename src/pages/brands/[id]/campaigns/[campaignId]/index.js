@@ -311,7 +311,7 @@ export default function CampaignDetail() {
     const getChartData = () => {
         if (activeGeoTab === 'location') {
             const data = mapView === 'countries' ? geoData.countries : geoData.cities;
-            return data.map((item) => ({
+            return data.slice(0, 15).map((item) => ({
                 date: item.name,
                 value: item.value,
             }));
@@ -321,12 +321,12 @@ export default function CampaignDetail() {
                 value: item.value,
             }));
         } else if (activeGeoTab === 'browsers') {
-            return geoData.map((item) => ({
+            return geoData.browsers.slice(0, 15).map((item) => ({
                 date: item.name,
                 value: item.value,
             }));
         } else if (activeGeoTab === 'os') {
-            return geoData.operatingSystems.map((item) => ({
+            return geoData.operatingSystems.slice(0, 15).map((item) => ({
                 date: item.name,
                 value: item.value,
             }));
