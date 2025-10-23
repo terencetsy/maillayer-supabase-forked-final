@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { Mail02, CheckmarkCircle02, AlertCircle } from '@/lib/icons';
+import { CheckmarkCircle02, AlertCircle, MailOutgoing } from '@/lib/icons';
 
 export default function Unsubscribe() {
     const router = useRouter();
@@ -78,6 +78,10 @@ export default function Unsubscribe() {
             <div className="auth-page">
                 <Head>
                     <title>Unsubscribe from Emails</title>
+                    <link
+                        rel="icon"
+                        href="/favicon.png"
+                    />
                 </Head>
                 <div className="auth-container">
                     <div className="auth-card">
@@ -96,6 +100,10 @@ export default function Unsubscribe() {
             <div className="auth-page">
                 <Head>
                     <title>Unsubscribe - Error</title>
+                    <link
+                        rel="icon"
+                        href="/favicon.png"
+                    />
                 </Head>
                 <div className="auth-container">
                     <div className="auth-card">
@@ -122,13 +130,17 @@ export default function Unsubscribe() {
         <div className="auth-page">
             <Head>
                 <title>Unsubscribe from Emails</title>
+                <link
+                    rel="icon"
+                    href="/favicon.png"
+                />
             </Head>
 
             <div className="auth-container">
                 <div className="auth-card">
                     {/* Logo */}
                     <div className="auth-logo">
-                        <Mail02 size={24} />
+                        <MailOutgoing size={24} />
                         <span>Unsubscribe</span>
                     </div>
 

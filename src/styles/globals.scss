@@ -6743,3 +6743,203 @@ select {
         transform: rotate(360deg);
     }
 }
+
+// Update the quota styles to match your light theme design
+
+.sidebar-footer {
+    padding: 0;
+    margin-top: auto;
+
+    .quota-container {
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.02);
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        transition: all 0.2s ease;
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .quota-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+
+            .quota-label {
+                font-size: 11px;
+                font-weight: 500;
+                color: rgba(0, 0, 0, 0.5);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .quota-percentage {
+                font-size: 13px;
+                font-weight: 600;
+                transition: color 0.3s ease;
+            }
+        }
+
+        .quota-bar-container {
+            height: 4px;
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            position: relative;
+
+            .quota-bar {
+                height: 100%;
+                border-radius: 2px;
+                transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+                position: relative;
+
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                    animation: shimmer 2s infinite;
+                }
+            }
+        }
+
+        .quota-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.5);
+            margin-bottom: 6px;
+
+            .quota-sent {
+                font-weight: 600;
+                color: rgba(0, 0, 0, 0.75);
+            }
+
+            .quota-total {
+                color: rgba(0, 0, 0, 0.45);
+            }
+        }
+
+        .quota-remaining {
+            font-size: 11px;
+            color: rgba(0, 0, 0, 0.45);
+            text-align: center;
+            padding-top: 6px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+    }
+
+    .quota-loading {
+        padding: 16px;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(0, 0, 0, 0.45);
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+
+        .spinner-small {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-top-color: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    }
+
+    .nav-item.secondary {
+        margin: 0;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 0;
+        color: rgba(0, 0, 0, 0.6);
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.04);
+            color: rgba(0, 0, 0, 0.8);
+        }
+    }
+}
+
+// Quota color variations for light theme
+.quota-container {
+    &.quota-low {
+        .quota-bar {
+            background: linear-gradient(90deg, #10b981, #059669);
+        }
+        .quota-percentage {
+            color: #059669;
+        }
+    }
+
+    &.quota-medium {
+        .quota-bar {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+        .quota-percentage {
+            color: #d97706;
+        }
+    }
+
+    &.quota-high {
+        .quota-bar {
+            background: linear-gradient(90deg, #f97316, #ea580c);
+        }
+        .quota-percentage {
+            color: #ea580c;
+        }
+    }
+
+    &.quota-critical {
+        .quota-bar {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+        }
+        .quota-percentage {
+            color: #dc2626;
+        }
+    }
+}
+
+// Animations
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+    .sidebar-footer {
+        .quota-container {
+            padding: 12px;
+
+            .quota-label {
+                font-size: 10px;
+            }
+
+            .quota-details {
+                font-size: 11px;
+            }
+
+            .quota-remaining {
+                font-size: 10px;
+            }
+        }
+    }
+}

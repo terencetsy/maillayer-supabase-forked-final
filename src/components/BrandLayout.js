@@ -9,6 +9,8 @@ export default function BrandLayout({ children, brand }) {
     const router = useRouter();
     const { data: session, status } = useSession();
     const [isLoading, setIsLoading] = useState(true);
+    const [quota, setQuota] = useState(null);
+    const [loadingQuota, setLoadingQuota] = useState(true);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -20,6 +22,41 @@ export default function BrandLayout({ children, brand }) {
             setIsLoading(false);
         }
     }, [status, router]);
+
+    // Fetch quota information
+    useEffect(() => {
+        if (brand && brand._id) {
+            fetchQuota();
+            // Refresh quota every 5 minutes
+            const interval = setInterval(fetchQuota, 5 * 60 * 1000);
+            return () => clearInterval(interval);
+        }
+    }, [brand]);
+
+    const getQuotaClass = (percentage) => {
+        if (percentage >= 90) return 'quota-critical';
+        if (percentage >= 75) return 'quota-high';
+        if (percentage >= 50) return 'quota-medium';
+        return 'quota-low';
+    };
+
+    const fetchQuota = async () => {
+        try {
+            const response = await fetch(`/api/brands/${brand._id}/quota`);
+            const data = await response.json();
+
+            if (response.ok && data.configured) {
+                setQuota(data.quota);
+            } else {
+                setQuota(null);
+            }
+        } catch (error) {
+            console.error('Error fetching quota:', error);
+            setQuota(null);
+        } finally {
+            setLoadingQuota(false);
+        }
+    };
 
     // Determine active menu item based on the current path
     const getActiveMenuItem = () => {
@@ -37,6 +74,19 @@ export default function BrandLayout({ children, brand }) {
     };
 
     const activeMenuItem = getActiveMenuItem();
+
+    // Format number with commas
+    const formatNumber = (num) => {
+        return new Intl.NumberFormat('en-US').format(Math.round(num));
+    };
+
+    // Get color based on percentage
+    const getQuotaColor = (percentage) => {
+        if (percentage >= 90) return '#ef4444'; // red
+        if (percentage >= 75) return '#f59e0b'; // orange
+        if (percentage >= 50) return '#eab308'; // yellow
+        return '#10b981'; // green
+    };
 
     if (isLoading) {
         return (
@@ -144,12 +194,39 @@ export default function BrandLayout({ children, brand }) {
                     </div>
 
                     <div className="sidebar-footer">
-                        <Link
-                            href="/brands"
-                            className="nav-item secondary"
-                        >
-                            <span>20,000 emails sent</span>
-                        </Link>
+                        {loadingQuota ? (
+                            <div className="quota-loading">
+                                <span className="spinner-small"></span>
+                                <span>Loading quota...</span>
+                            </div>
+                        ) : quota ? (
+                            <div className={`quota-container ${getQuotaClass(quota.percentageUsed)}`}>
+                                <div className="quota-header">
+                                    <span className="quota-label">24-Hour Email Quota</span>
+                                    <span className="quota-percentage">{quota.percentageUsed.toFixed(1)}%</span>
+                                </div>
+                                <div className="quota-bar-container">
+                                    <div
+                                        className="quota-bar"
+                                        style={{
+                                            width: `${Math.min(quota.percentageUsed, 100)}%`,
+                                        }}
+                                    />
+                                </div>
+                                <div className="quota-details">
+                                    <span className="quota-sent">{formatNumber(quota.sentLast24Hours)} sent</span>
+                                    <span className="quota-total">of {formatNumber(quota.max24HourSend)}</span>
+                                </div>
+                                <div className="quota-remaining">{formatNumber(quota.remainingQuota)} emails remaining</div>
+                            </div>
+                        ) : (
+                            <Link
+                                href={`/brands/${brand._id}/verification`}
+                                className="nav-item secondary"
+                            >
+                                <span>Configure AWS to view quota</span>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
