@@ -20,7 +20,7 @@ export async function createCampaign(campaignData) {
 export async function getCampaignsByBrandId(brandId, userId, options = {}) {
     await connectToDatabase();
 
-    const { skip = 0, limit = 8 } = options;
+    const { skip = 0, limit = 10 } = options;
 
     const campaigns = await Campaign.find({
         brandId,
