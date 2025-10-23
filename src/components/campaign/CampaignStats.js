@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { ArrowLeft, Mail, MousePointer, AlertTriangle, Filter, Download, ChevronLeft, ChevronRight, MailX, Users, Eye, X, Clock, Calendar, Send, Globe, MapPin, Smartphone, Monitor, Tablet, Server, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Mail, MousePointer, AlertTriangle, Filter, Download, MailX, Users, Eye, X, Clock, Calendar, Send, Globe, MapPin, Smartphone, Monitor, Tablet, Server, ChevronDown } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import GeoBarChart from '@/components/campaign/GeoBarChart';
 
@@ -867,7 +867,6 @@ export default function CampaignDetail() {
                                                 onClick={() => handlePageChange(pagination.page - 1)}
                                                 disabled={pagination.page <= 1}
                                             >
-                                                <ChevronLeft size={16} />
                                                 <span>Previous</span>
                                             </button>
 
@@ -881,7 +880,6 @@ export default function CampaignDetail() {
                                                 disabled={pagination.page >= pagination.totalPages}
                                             >
                                                 <span>Next</span>
-                                                <ChevronRight size={16} />
                                             </button>
                                         </div>
                                     )}

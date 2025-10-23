@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import BrandLayout from '@/components/BrandLayout';
 import CampaignForm from '@/components/CampaignForm';
 import CampaignList from '@/components/CampaignList';
-import { Mail02, PlusSign, PlusSignCircle, Search01, ChevronLeft, ChevronRight } from '@/lib/icons';
+import { Mail02, PlusSign, PlusSignCircle, Search01 } from '@/lib/icons';
 
 export default function BrandCampaigns() {
     const { data: session, status } = useSession();
@@ -100,16 +100,32 @@ export default function BrandCampaigns() {
     };
 
     const fetchCampaignsStats = async (campaignsList) => {
-        // Filter campaigns that need stats (not draft or scheduled)
-        const campaignsNeedingStats = campaignsList.filter((campaign) => campaign.status !== 'draft' && campaign.status !== 'scheduled');
-
-        // Fetch stats for each campaign progressively
-        for (const campaign of campaignsNeedingStats) {
-            fetchCampaignStats(campaign._id);
+        if (!Array.isArray(campaignsList)) {
+            console.error('Invalid campaigns list provided to fetchCampaignsStats');
+            return;
         }
+
+        // Filter campaigns that need stats (not draft or scheduled)
+        const campaignsNeedingStats = campaignsList.filter((campaign) => campaign && campaign.status !== 'draft' && campaign.status !== 'scheduled');
+
+        // Fetch all stats in parallel instead of sequentially
+        await Promise.all(
+            campaignsNeedingStats.map((campaign) => {
+                if (campaign && campaign._id) {
+                    return fetchCampaignStats(campaign._id);
+                }
+                return Promise.resolve();
+            })
+        );
     };
 
     const fetchCampaignStats = async (campaignId) => {
+        // Validate campaignId
+        if (!campaignId) {
+            console.error('Invalid campaignId provided to fetchCampaignStats');
+            return;
+        }
+
         // Skip if already loading or loaded
         if (loadingStats[campaignId] || campaignStats[campaignId]) {
             return;
@@ -123,12 +139,13 @@ export default function BrandCampaigns() {
             });
 
             if (!res.ok) {
-                throw new Error('Failed to fetch campaign stats');
+                console.warn(`Failed to fetch stats for campaign ${campaignId}`);
+                return;
             }
 
             const data = await res.json();
 
-            if (data.statistics) {
+            if (data && data.statistics) {
                 setCampaignStats((prev) => ({
                     ...prev,
                     [campaignId]: data.statistics,
@@ -322,7 +339,6 @@ export default function BrandCampaigns() {
                                                                 cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer',
                                                             }}
                                                         >
-                                                            <ChevronLeft size={16} />
                                                             <span>Previous</span>
                                                         </button>
 
@@ -340,7 +356,6 @@ export default function BrandCampaigns() {
                                                             }}
                                                         >
                                                             <span>Next</span>
-                                                            <ChevronRight size={16} />
                                                         </button>
                                                     </div>
                                                 </div>
