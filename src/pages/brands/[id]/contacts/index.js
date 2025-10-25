@@ -212,75 +212,76 @@ export default function BrandContacts() {
                                         </button>
                                     </div>
                                 ) : (
-                                    <table className="campaigns-table">
-                                        <thead>
-                                            <tr>
-                                                <th>List Name</th>
-                                                <th>Contacts</th>
-                                                <th>Created</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredContactLists.map((list) => (
-                                                <tr key={list._id}>
-                                                    <td className="campaign-col">
-                                                        <div className="campaign-info">
-                                                            <Users size={16} />
-                                                            <div>
-                                                                <div style={{ fontWeight: '500' }}>{list.name}</div>
-                                                                {list.description && <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>{list.description}</div>}
+                                    <div className="contact-lists-table-wrapper">
+                                        <table className="campaigns-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>List Name</th>
+                                                    <th>Contacts</th>
+                                                    <th>Created</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredContactLists.map((list) => (
+                                                    <tr key={list._id}>
+                                                        <td className="campaign-col">
+                                                            <div className="campaign-info">
+                                                                <div>
+                                                                    <div style={{ fontWeight: '500' }}>{list.name}</div>
+                                                                    {list.description && <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>{list.description}</div>}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="stats-value">
-                                                            <span style={{ fontWeight: '500' }}>{list.contactCount || 0}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>{formatDate(list.createdAt)}</td>
-                                                    <td>
-                                                        <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500', backgroundColor: '#e8f5e9', color: '#2e7d32' }}>Active</span>
-                                                    </td>
-                                                    <td className="actions-col">
-                                                        <div className="action-buttons">
-                                                            <Link
-                                                                href={`/brands/${id}/contacts/${list._id}`}
-                                                                className="action-btn"
-                                                                title="View Details"
-                                                            >
-                                                                <Eye />
-                                                            </Link>
-                                                            <button
-                                                                className="action-btn"
-                                                                onClick={(e) => handleImportContacts(e, list._id, 'manual')}
-                                                                title="Add Contact"
-                                                            >
-                                                                <UserPlus size={16} />
-                                                                Add
-                                                            </button>
-                                                            <button
-                                                                className="action-btn"
-                                                                onClick={(e) => handleImportContacts(e, list._id, 'csv')}
-                                                                title="Import CSV"
-                                                            >
-                                                                <UploadCloud size={16} />
-                                                                Import
-                                                            </button>
-                                                            {/* <button
+                                                        </td>
+                                                        <td>
+                                                            <div className="stats-value">
+                                                                <span style={{ fontWeight: '500' }}>{list.contactCount || 0}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td>{formatDate(list.createdAt)}</td>
+                                                        <td>
+                                                            <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '500', backgroundColor: '#e8f5e9', color: '#2e7d32' }}>Active</span>
+                                                        </td>
+                                                        <td className="actions-col">
+                                                            <div className="action-buttons">
+                                                                <Link
+                                                                    href={`/brands/${id}/contacts/${list._id}`}
+                                                                    className="action-btn"
+                                                                    title="View Details"
+                                                                >
+                                                                    <Eye />
+                                                                </Link>
+                                                                <button
+                                                                    className="action-btn"
+                                                                    onClick={(e) => handleImportContacts(e, list._id, 'manual')}
+                                                                    title="Add Contact"
+                                                                >
+                                                                    <UserPlus size={16} />
+                                                                    Add
+                                                                </button>
+                                                                <button
+                                                                    className="action-btn"
+                                                                    onClick={(e) => handleImportContacts(e, list._id, 'csv')}
+                                                                    title="Import CSV"
+                                                                >
+                                                                    <UploadCloud size={16} />
+                                                                    Import
+                                                                </button>
+                                                                {/* <button
                                                                 className="action-btn delete-btn"
                                                                 onClick={(e) => handleDeleteList(e, list._id)}
                                                                 title="Delete List"
                                                             >
                                                                 <Trash size={16} />
                                                             </button> */}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
                             </>
                         )}

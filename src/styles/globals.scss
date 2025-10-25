@@ -101,6 +101,7 @@ select {
     }
 }
 
+// Shared table styles
 .campaigns-table {
     width: 100%;
     border-collapse: collapse;
@@ -153,12 +154,16 @@ select {
 
             .campaign-col {
                 .campaign-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-
                     svg {
                         font-size: 16px;
+                    }
+
+                    .campaign-details {
+                        .campaign-subject {
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                        }
                     }
                 }
             }
@@ -202,6 +207,75 @@ select {
     }
 }
 
+// Campaigns table specific widths
+.campaigns-table-wrapper {
+    .campaigns-table {
+        .campaign-col {
+            width: 250px;
+            min-width: 250px;
+        }
+
+        .recipients-col,
+        .openrate-col,
+        .unsub-col,
+        .bounce-col {
+            width: 80px;
+        }
+
+        .created-col {
+            width: 100px;
+        }
+
+        .actions-col {
+            width: 180px;
+        }
+    }
+}
+
+// Contact lists table specific widths
+.contact-lists-table-wrapper {
+    .campaigns-table {
+        thead tr th:nth-child(1) {
+            width: 35%;
+        } // List Name
+        thead tr th:nth-child(2) {
+            width: 12%;
+        } // Contacts
+        thead tr th:nth-child(3) {
+            width: 15%;
+        } // Created
+        thead tr th:nth-child(4) {
+            width: 12%;
+        } // Status
+        thead tr th:nth-child(5) {
+            width: 26%;
+        } // Actions
+
+        tbody tr td:nth-child(1) {
+            width: 35%;
+        }
+        tbody tr td:nth-child(2) {
+            width: 12%;
+        }
+        tbody tr td:nth-child(3) {
+            width: 15%;
+        }
+        tbody tr td:nth-child(4) {
+            width: 12%;
+        }
+        tbody tr td:nth-child(5) {
+            width: 26%;
+        }
+
+        .campaign-col {
+            > div > div {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    }
+}
 .button {
     padding: 0.6rem 1rem;
     border-radius: 12.8px;

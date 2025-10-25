@@ -182,7 +182,6 @@ export default function TransactionalTemplates() {
                                                 <thead>
                                                     <tr>
                                                         <th className="campaign-col">Template</th>
-                                                        <th className="status-col">Status</th>
                                                         <th className="openrate-col">Sent</th>
                                                         <th className="created-col">Created</th>
                                                         <th className="actions-col">Actions</th>
@@ -194,20 +193,17 @@ export default function TransactionalTemplates() {
                                                             <td className="campaign-col">
                                                                 <div className="campaign-info">
                                                                     <div className="email-icon">
-                                                                        <Code size={18} />
+                                                                        <div className={`status-badge ${template.status}`}>
+                                                                            {template.status === 'active' && <CheckmarkCircle02 size={14} />}
+                                                                            {template.status === 'draft' && <Clock01 size={14} />}
+                                                                            {template.status === 'inactive' && <AlertCircle size={14} />}
+                                                                            {template.status === 'active' ? 'Active' : template.status === 'draft' ? 'Draft' : 'Inactive'}
+                                                                        </div>
                                                                     </div>
                                                                     <div className="campaign-details">
                                                                         <div className="campaign-name">{template.name}</div>
                                                                         <div className="campaign-subject">{template.subject}</div>
                                                                     </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="status-col">
-                                                                <div className={`status-badge ${template.status}`}>
-                                                                    {template.status === 'active' && <CheckmarkCircle02 size={14} />}
-                                                                    {template.status === 'draft' && <Clock01 size={14} />}
-                                                                    {template.status === 'inactive' && <AlertCircle size={14} />}
-                                                                    {template.status === 'active' ? 'Active' : template.status === 'draft' ? 'Draft' : 'Inactive'}
                                                                 </div>
                                                             </td>
                                                             <td className="openrate-col">

@@ -89,12 +89,12 @@ const CampaignList = ({ campaigns, brandId }) => {
     };
 
     return (
-        <div className="campaigns-table-container">
+        <div className="campaigns-table-container campaigns-table-wrapper">
             <table className="campaigns-table">
                 <thead>
                     <tr>
                         <th className="campaign-col">Campaign</th>
-                        <th className="status-col">Status</th>
+                        {/* <th className="status-col">Status</th> */}
                         <th className="recipients-col">Recipients</th>
                         <th className="openrate-col">Open Rate</th>
                         <th className="unsub-col">Unsubscribed</th>
@@ -108,15 +108,13 @@ const CampaignList = ({ campaigns, brandId }) => {
                         <tr key={campaign._id}>
                             <td className="campaign-col">
                                 <div className="campaign-info">
-                                    <div className="email-icon">
-                                        <Mail02 />
-                                    </div>
+                                    <div className="email-icon">{renderStatusBadge(campaign.status)}</div>
                                     <div className="campaign-details">
                                         <div className="campaign-subject">{campaign.subject}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td className="status-col">{renderStatusBadge(campaign.status)}</td>
+                            {/* <td className="status-col">{renderStatusBadge(campaign.status)}</td> */}
 
                             {/* Recipients */}
                             <td className="recipients-col">{needsStats(campaign) ? (campaign.statsLoading ? renderStatsSkeleton() : campaign.statistics?.recipients || campaign.stats?.recipients || 0) : campaign.stats?.recipients || 0}</td>
