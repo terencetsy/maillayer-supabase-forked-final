@@ -11,18 +11,15 @@ export default function SequenceSettings({ sequence, onUpdate }) {
     const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
-        // Initialize from sequence
         setFromName(sequence.emailConfig?.fromName || '');
         setFromEmail(sequence.emailConfig?.fromEmail || '');
         setReplyToEmail(sequence.emailConfig?.replyToEmail || '');
         setDescription(sequence.description || '');
 
-        // Fetch brand details for defaults
         fetchBrandDetails();
     }, [sequence]);
 
     useEffect(() => {
-        // Check if there are changes
         const changed = fromName !== (sequence.emailConfig?.fromName || '') || fromEmail !== (sequence.emailConfig?.fromEmail || '') || replyToEmail !== (sequence.emailConfig?.replyToEmail || '') || description !== (sequence.description || '');
 
         setHasChanges(changed);
@@ -37,7 +34,6 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                 const data = await response.json();
                 setBrand(data);
 
-                // Set defaults from brand if not already set
                 if (!sequence.emailConfig?.fromName && data.fromName) {
                     setFromName(data.fromName);
                 }
@@ -56,18 +52,13 @@ export default function SequenceSettings({ sequence, onUpdate }) {
     const handleSave = () => {
         onUpdate({
             description,
-            emailConfig: {
-                fromName,
-                fromEmail,
-                replyToEmail,
-            },
+            emailConfig: { fromName, fromEmail, replyToEmail },
         });
         setHasChanges(false);
     };
 
     const handleUseBrandDefaults = () => {
         if (!brand) return;
-
         setFromName(brand.fromName || '');
         setFromEmail(brand.fromEmail || '');
         setReplyToEmail(brand.replyToEmail || '');
@@ -81,8 +72,8 @@ export default function SequenceSettings({ sequence, onUpdate }) {
 
     return (
         <div className="sequence-settings">
-            <h2>Sequence Settings</h2>
-            <p className="subtitle">Configure email sender information and sequence details</p>
+            <h2>Settings</h2>
+            <p className="subtitle">Configure sequence details and email sender information</p>
 
             {/* Description */}
             <div className="form-section">
@@ -90,18 +81,17 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                 <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe what this sequence does..."
+                    placeholder="Describe the purpose of this sequence..."
                     className="form-textarea"
                     rows={3}
                 />
-                <p className="helper-text">Optional description to help you remember the purpose of this sequence</p>
             </div>
 
             {/* Email Configuration */}
             <div className="form-section">
                 <div className="section-title">
                     <Mail size={18} />
-                    <h3>Email Configuration</h3>
+                    <h3>Email Settings</h3>
                 </div>
 
                 {brand && (
@@ -113,16 +103,16 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                                 className="text-button"
                                 onClick={handleUseBrandDefaults}
                             >
-                                Use defaults
+                                Use
                             </button>
                         </div>
                         <div className="brand-defaults-content">
                             <div className="default-item">
-                                <span className="default-label">From:</span>
+                                <span className="default-label">From</span>
                                 <span className="default-value">{brand.fromEmail || 'Not set'}</span>
                             </div>
                             <div className="default-item">
-                                <span className="default-label">Reply-To:</span>
+                                <span className="default-label">Reply</span>
                                 <span className="default-value">{brand.replyToEmail || 'Not set'}</span>
                             </div>
                         </div>
@@ -140,7 +130,6 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                         placeholder="Your Company"
                         className="form-input"
                     />
-                    <p className="helper-text">The name recipients will see in their inbox</p>
                 </div>
 
                 <div className="form-group">
@@ -156,11 +145,10 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                     />
                     {fromEmail && !isValidEmail(fromEmail) && (
                         <div className="field-error">
-                            <AlertCircle size={14} />
-                            <span>Please enter a valid email address</span>
+                            <AlertCircle size={13} />
+                            <span>Invalid email</span>
                         </div>
                     )}
-                    <p className="helper-text">Email address that will appear as the sender</p>
                 </div>
 
                 <div className="form-group">
@@ -176,193 +164,27 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                     />
                     {replyToEmail && !isValidEmail(replyToEmail) && (
                         <div className="field-error">
-                            <AlertCircle size={14} />
-                            <span>Please enter a valid email address</span>
+                            <AlertCircle size={13} />
+                            <span>Invalid email</span>
                         </div>
                     )}
-                    <p className="helper-text">Where replies will be sent</p>
                 </div>
             </div>
 
-            {/* Save Button */}
+            {/* Save Bar */}
             {hasChanges && (
                 <div className="save-bar">
-                    <p>You have unsaved changes</p>
+                    <p>Unsaved</p>
                     <button
                         className="button button--primary"
                         onClick={handleSave}
                         disabled={!hasValidConfig}
                     >
-                        <Save size={16} />
-                        Save Settings
+                        <Save size={14} />
+                        Save
                     </button>
                 </div>
             )}
-
-            <style jsx>{`
-                .sequence-settings {
-                    padding-bottom: 80px;
-                }
-
-                .sequence-settings h2 {
-                    margin: 0 0 8px 0;
-                    font-size: 1.125rem;
-                    font-weight: 600;
-                }
-
-                .subtitle {
-                    margin: 0 0 24px 0;
-                    font-size: 0.875rem;
-                    color: #666;
-                }
-
-                .form-section {
-                    margin-bottom: 32px;
-                }
-
-                .section-title {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-bottom: 16px;
-                }
-
-                .section-title h3 {
-                    margin: 0;
-                    font-size: 1rem;
-                    font-weight: 500;
-                }
-
-                .brand-defaults-card {
-                    padding: 12px;
-                    background: #f9f9f9;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 8px;
-                    margin-bottom: 16px;
-                }
-
-                .brand-defaults-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 8px;
-                }
-
-                .brand-defaults-label {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    color: #666;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-
-                .text-button {
-                    background: none;
-                    border: none;
-                    color: #2196f3;
-                    font-size: 0.875rem;
-                    cursor: pointer;
-                    padding: 0;
-                }
-
-                .text-button:hover {
-                    text-decoration: underline;
-                }
-
-                .brand-defaults-content {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 6px;
-                }
-
-                .default-item {
-                    display: flex;
-                    justify-content: space-between;
-                    font-size: 0.875rem;
-                }
-
-                .default-label {
-                    color: #666;
-                }
-
-                .default-value {
-                    color: #1a1a1a;
-                    font-weight: 500;
-                }
-
-                .form-group {
-                    margin-bottom: 20px;
-                }
-
-                .form-label {
-                    display: block;
-                    margin-bottom: 8px;
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    color: #1a1a1a;
-                }
-
-                .form-required {
-                    color: #dc2626;
-                    margin-left: 2px;
-                }
-
-                .form-input,
-                .form-textarea {
-                    width: 100%;
-                    padding: 10px 12px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 6px;
-                    font-size: 0.9375rem;
-                    font-family: inherit;
-                }
-
-                .form-input:focus,
-                .form-textarea:focus {
-                    outline: none;
-                    border-color: #1a1a1a;
-                }
-
-                .form-textarea {
-                    resize: vertical;
-                }
-
-                .helper-text {
-                    margin: 8px 0 0 0;
-                    font-size: 0.8125rem;
-                    color: #666;
-                }
-
-                .field-error {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-top: 8px;
-                    font-size: 0.8125rem;
-                    color: #dc2626;
-                }
-
-                .save-bar {
-                    position: fixed;
-                    bottom: 0;
-                    right: 0;
-                    width: 400px;
-                    padding: 16px 20px;
-                    background: #fff;
-                    border-top: 1px solid #e0e0e0;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-                    z-index: 10;
-                }
-
-                .save-bar p {
-                    margin: 0;
-                    font-size: 0.875rem;
-                    color: #666;
-                }
-            `}</style>
         </div>
     );
 }

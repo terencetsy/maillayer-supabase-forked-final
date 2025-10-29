@@ -1,14 +1,12 @@
 // src/components/sequences/SequenceCanvas.js
-import { useState, useRef, useEffect } from 'react';
-import { Plus, Mail, AlertCircle } from 'lucide-react';
+import { useRef } from 'react';
+import { Plus } from 'lucide-react';
 import TriggerBlock from './blocks/TriggerBlock';
 import EmailBlock from './blocks/EmailBlock';
 import AddEmailButton from './blocks/AddEmailButton';
 
 export default function SequenceCanvas({ sequence, onUpdate, selectedStep, setSelectedStep }) {
     const canvasRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     const handleAddEmail = () => {
         const newEmailId = `email-${Date.now()}`;
@@ -104,36 +102,6 @@ export default function SequenceCanvas({ sequence, onUpdate, selectedStep, setSe
                     <AddEmailButton onClick={handleAddEmail} />
                 </div>
             </div>
-
-            <style jsx>{`
-                .sequence-canvas {
-                    flex: 1;
-                    position: relative;
-                    background: #fafafa;
-                    overflow: auto;
-                    min-height: 100vh;
-                }
-
-                .canvas-content {
-                    position: relative;
-                    width: 100%;
-                    min-height: 100%;
-                    padding: 40px;
-                }
-
-                .canvas-block-wrapper {
-                    position: absolute;
-                    z-index: 1;
-                }
-
-                .canvas-connection-line {
-                    position: absolute;
-                    width: 2px;
-                    background: #e0e0e0;
-                    transform: translateX(-1px);
-                    z-index: 0;
-                }
-            `}</style>
         </div>
     );
 }
