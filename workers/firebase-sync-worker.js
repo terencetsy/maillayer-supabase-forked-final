@@ -1,5 +1,5 @@
 // workers/firebase-sync-worker.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const firebaseAdmin = require('firebase-admin');

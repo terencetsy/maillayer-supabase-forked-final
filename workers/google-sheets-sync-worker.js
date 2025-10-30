@@ -1,5 +1,5 @@
 // workers/google-sheets-sync-worker.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const { google } = require('googleapis');

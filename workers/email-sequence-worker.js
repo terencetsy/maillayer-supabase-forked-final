@@ -1,5 +1,5 @@
 // workers/email-sequence-worker.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const Bull = require('bull');
 const Redis = require('ioredis');
@@ -50,12 +50,33 @@ const emailSequenceQueue = new Bull('email-sequences', {
 const EmailSequenceSchema = new mongoose.Schema(
     {
         name: String,
+        description: String,
         brandId: mongoose.Schema.Types.ObjectId,
         userId: mongoose.Schema.Types.ObjectId,
-        contactListIds: [mongoose.Schema.Types.ObjectId],
-        status: String,
+        triggerType: {
+            type: String,
+            enum: ['contact_list', 'integration', 'webhook', 'manual'],
+            default: 'contact_list',
+        },
+        triggerConfig: {
+            contactListIds: [mongoose.Schema.Types.ObjectId],
+            integrationType: String,
+            integrationEvent: String,
+            integrationAccountId: String,
+        },
+        emailConfig: {
+            fromName: String,
+            fromEmail: String,
+            replyToEmail: String,
+        },
+        status: {
+            type: String,
+            enum: ['active', 'paused', 'archived', 'draft'],
+            default: 'draft',
+        },
         emails: [
             {
+                id: String,
                 order: Number,
                 subject: String,
                 content: String,
@@ -64,9 +85,9 @@ const EmailSequenceSchema = new mongoose.Schema(
             },
         ],
         stats: {
-            totalEnrolled: Number,
-            totalCompleted: Number,
-            totalActive: Number,
+            totalEnrolled: { type: Number, default: 0 },
+            totalCompleted: { type: Number, default: 0 },
+            totalActive: { type: Number, default: 0 },
         },
     },
     { timestamps: true, collection: 'emailsequences' }
@@ -393,7 +414,7 @@ async function enrollNewContact(job) {
     const { contactId, brandId, listId, sequenceId } = job.data;
 
     try {
-        console.log(`[Sequence Worker] Processing enrollment for contact ${contactId} in sequence ${sequenceId}`);
+        console.log(`[Sequence Worker] Processing enrollment for contact ${contactId} in list ${listId}`);
 
         const EmailSequence = mongoose.model('EmailSequence');
         const SequenceEnrollment = mongoose.model('SequenceEnrollment');
@@ -414,16 +435,17 @@ async function enrollNewContact(job) {
                 sequences.push(sequence);
             }
         } else {
-            // Find all active sequences for this list
+            // Find all active sequences that have this list in their triggerConfig
             sequences = await EmailSequence.find({
                 brandId: new mongoose.Types.ObjectId(brandId),
-                contactListIds: new mongoose.Types.ObjectId(listId),
                 status: 'active',
+                triggerType: 'contact_list',
+                'triggerConfig.contactListIds': new mongoose.Types.ObjectId(listId),
             });
         }
 
         if (sequences.length === 0) {
-            console.log(`[Sequence Worker] No active sequences found`);
+            console.log(`[Sequence Worker] No active sequences found for list ${listId}`);
             return { success: false, message: 'No active sequences' };
         }
 
@@ -478,7 +500,7 @@ async function enrollNewContact(job) {
                 console.log(`[Sequence Worker] Created enrollment for contact ${contact.email} in sequence ${sequence.name}`);
 
                 // Get first email (sorted by order)
-                const sortedEmails = sequence.emails.sort((a, b) => a.order - b.order);
+                const sortedEmails = [...sequence.emails].sort((a, b) => a.order - b.order);
                 const firstEmail = sortedEmails[0];
 
                 if (firstEmail) {

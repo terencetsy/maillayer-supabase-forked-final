@@ -1,5 +1,5 @@
 // src/components/sequences/sidebar/EmailConfig.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Clock, Trash, Save } from 'lucide-react';
 import UnifiedEditor from '@/components/editor/UnifiedEditor';
 
@@ -9,22 +9,82 @@ export default function EmailConfig({ sequence, email, onUpdate }) {
     const [delayAmount, setDelayAmount] = useState(email.delayAmount || 1);
     const [delayUnit, setDelayUnit] = useState(email.delayUnit || 'days');
 
+    const updateTimeoutRef = useRef(null);
+    const isInitialMount = useRef(true);
+
+    // Update local state when email prop changes (but not on initial mount)
     useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        // Only update if the email ID changed (switching between emails)
         setSubject(email.subject || '');
         setContent(email.content || '');
         setDelayAmount(email.delayAmount || 1);
         setDelayUnit(email.delayUnit || 'days');
-    }, [email]);
+    }, [email.id]); // Only trigger when email ID changes
 
-    const handleSave = () => {
+    // Debounced update function
+    const debouncedUpdate = (updates) => {
+        if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current);
+        }
+
+        updateTimeoutRef.current = setTimeout(() => {
+            handleSave(updates);
+        }, 500); // Update after 500ms of no changes
+    };
+
+    // Handle subject change
+    const handleSubjectChange = (newSubject) => {
+        setSubject(newSubject);
+        debouncedUpdate({ subject: newSubject, content, delayAmount, delayUnit });
+    };
+
+    // Handle content change
+    const handleContentChange = (newContent) => {
+        setContent(newContent);
+        debouncedUpdate({ subject, content: newContent, delayAmount, delayUnit });
+    };
+
+    // Handle delay change
+    const handleDelayChange = (newDelayAmount, newDelayUnit) => {
+        const amount = newDelayAmount !== undefined ? newDelayAmount : delayAmount;
+        const unit = newDelayUnit !== undefined ? newDelayUnit : delayUnit;
+
+        setDelayAmount(amount);
+        if (newDelayUnit !== undefined) {
+            setDelayUnit(unit);
+        }
+
+        debouncedUpdate({ subject, content, delayAmount: amount, delayUnit: unit });
+    };
+
+    const handleSave = (updates = {}) => {
+        const updatesToUse = {
+            subject: updates.subject !== undefined ? updates.subject : subject,
+            content: updates.content !== undefined ? updates.content : content,
+            delayAmount: updates.delayAmount !== undefined ? Number(updates.delayAmount) : Number(delayAmount),
+            delayUnit: updates.delayUnit !== undefined ? updates.delayUnit : delayUnit,
+        };
+
+        // Find and update the specific email
         const updatedEmails = sequence.emails.map((e) => {
             if (e.id === email.id) {
-                return { ...e, subject, content, delayAmount, delayUnit };
+                return {
+                    ...e,
+                    ...updatesToUse,
+                };
             }
             return e;
         });
 
-        onUpdate({ emails: updatedEmails });
+        // Only update if emails array actually changed
+        if (JSON.stringify(updatedEmails) !== JSON.stringify(sequence.emails)) {
+            onUpdate({ emails: updatedEmails });
+        }
     };
 
     const handleDelete = () => {
@@ -42,7 +102,16 @@ export default function EmailConfig({ sequence, email, onUpdate }) {
         onUpdate({ emails: updatedEmails });
     };
 
-    const hasChanges = subject !== email.subject || content !== email.content || delayAmount !== email.delayAmount || delayUnit !== email.delayUnit;
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const hasChanges = subject !== (email.subject || '') || content !== (email.content || '') || Number(delayAmount) !== Number(email.delayAmount || 1) || delayUnit !== (email.delayUnit || 'days');
 
     return (
         <div className="email-config">
@@ -70,12 +139,12 @@ export default function EmailConfig({ sequence, email, onUpdate }) {
                         type="number"
                         min="0"
                         value={delayAmount}
-                        onChange={(e) => setDelayAmount(parseInt(e.target.value) || 0)}
+                        onChange={(e) => handleDelayChange(parseInt(e.target.value) || 0)}
                         className="form-input"
                     />
                     <select
                         value={delayUnit}
-                        onChange={(e) => setDelayUnit(e.target.value)}
+                        onChange={(e) => handleDelayChange(undefined, e.target.value)}
                         className="form-select"
                     >
                         <option value="minutes">Minutes</option>
@@ -94,7 +163,7 @@ export default function EmailConfig({ sequence, email, onUpdate }) {
                 <input
                     type="text"
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    onChange={(e) => handleSubjectChange(e.target.value)}
                     placeholder="Welcome! Here's what's next..."
                     className="form-input"
                 />
@@ -106,22 +175,18 @@ export default function EmailConfig({ sequence, email, onUpdate }) {
                     Content<span className="form-required">*</span>
                 </label>
                 <UnifiedEditor
-                    content={content}
-                    onChange={setContent}
+                    value={content}
+                    onChange={handleContentChange}
                 />
             </div>
 
-            {/* Compact Save Bar */}
+            {/* Save indicator - only shows briefly */}
             {hasChanges && (
-                <div className="save-bar">
-                    <p>Unsaved changes</p>
-                    <button
-                        className="button button--primary"
-                        onClick={handleSave}
-                    >
-                        <Save size={14} />
-                        Save
-                    </button>
+                <div
+                    className="save-bar"
+                    style={{ opacity: 0.7 }}
+                >
+                    <p>Changes pending...</p>
                 </div>
             )}
         </div>

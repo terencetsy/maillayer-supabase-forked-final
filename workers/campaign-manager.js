@@ -1,5 +1,5 @@
 // workers/campaign-manager.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const Bull = require('bull');
 const Redis = require('ioredis');

@@ -48,8 +48,11 @@ export async function getEmailSequenceById(sequenceId, userId) {
     return sequence;
 }
 
+// src/services/emailSequenceService.js (update the updateEmailSequence function)
 export async function updateEmailSequence(sequenceId, userId, updateData) {
     await connectToDatabase();
+
+    console.log('Service updating sequence:', sequenceId, updateData); // Debug log
 
     // If updating emails, ensure they have IDs
     if (updateData.emails) {
@@ -70,7 +73,10 @@ export async function updateEmailSequence(sequenceId, userId, updateData) {
             // Check if sequence is ready to be activated
             if (updateData.status === 'active') {
                 // Must have trigger configured
-                if (!sequence.triggerConfig?.contactListIds?.length && sequence.triggerType === 'contact_list') {
+                const triggerConfig = updateData.triggerConfig || sequence.triggerConfig;
+                const triggerType = updateData.triggerType || sequence.triggerType;
+
+                if (triggerType === 'contact_list' && !triggerConfig?.contactListIds?.length) {
                     throw new Error('Please configure trigger lists before activating');
                 }
 
@@ -89,27 +95,37 @@ export async function updateEmailSequence(sequenceId, userId, updateData) {
         }
     }
 
-    const result = await EmailSequence.updateOne(
+    // Prepare the update object
+    const updateObject = {
+        ...updateData,
+        updatedAt: new Date(),
+    };
+
+    console.log('Updating with object:', updateObject); // Debug log
+
+    const result = await EmailSequence.findOneAndUpdate(
         {
             _id: new mongoose.Types.ObjectId(sequenceId),
             userId: new mongoose.Types.ObjectId(userId),
         },
         {
-            $set: {
-                ...updateData,
-                updatedAt: new Date(),
-            },
+            $set: updateObject,
+        },
+        {
+            new: true, // Return the updated document
+            runValidators: true,
         }
     );
 
-    if (result.modifiedCount === 0) {
+    if (!result) {
+        console.log('No sequence found to update'); // Debug log
         return null;
     }
 
-    // Return updated sequence
-    return await getEmailSequenceById(sequenceId, userId);
-}
+    console.log('Sequence updated successfully:', result); // Debug log
 
+    return result;
+}
 export async function deleteEmailSequence(sequenceId, userId) {
     await connectToDatabase();
 

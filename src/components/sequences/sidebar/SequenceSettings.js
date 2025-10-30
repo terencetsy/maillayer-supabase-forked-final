@@ -1,5 +1,5 @@
 // src/components/sequences/sidebar/SequenceSettings.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mail, Save, AlertCircle } from 'lucide-react';
 
 export default function SequenceSettings({ sequence, onUpdate }) {
@@ -8,22 +8,28 @@ export default function SequenceSettings({ sequence, onUpdate }) {
     const [replyToEmail, setReplyToEmail] = useState('');
     const [description, setDescription] = useState('');
     const [brand, setBrand] = useState(null);
-    const [hasChanges, setHasChanges] = useState(false);
+
+    const updateTimeoutRef = useRef(null);
+    const isInitialMount = useRef(true);
 
     useEffect(() => {
-        setFromName(sequence.emailConfig?.fromName || '');
-        setFromEmail(sequence.emailConfig?.fromEmail || '');
-        setReplyToEmail(sequence.emailConfig?.replyToEmail || '');
-        setDescription(sequence.description || '');
-
-        fetchBrandDetails();
-    }, [sequence]);
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            setFromName(sequence.emailConfig?.fromName || '');
+            setFromEmail(sequence.emailConfig?.fromEmail || '');
+            setReplyToEmail(sequence.emailConfig?.replyToEmail || '');
+            setDescription(sequence.description || '');
+            fetchBrandDetails();
+        }
+    }, []);
 
     useEffect(() => {
-        const changed = fromName !== (sequence.emailConfig?.fromName || '') || fromEmail !== (sequence.emailConfig?.fromEmail || '') || replyToEmail !== (sequence.emailConfig?.replyToEmail || '') || description !== (sequence.description || '');
-
-        setHasChanges(changed);
-    }, [fromName, fromEmail, replyToEmail, description, sequence]);
+        return () => {
+            if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const fetchBrandDetails = async () => {
         try {
@@ -34,6 +40,7 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                 const data = await response.json();
                 setBrand(data);
 
+                // Only set defaults if current values are empty
                 if (!sequence.emailConfig?.fromName && data.fromName) {
                     setFromName(data.fromName);
                 }
@@ -49,19 +56,77 @@ export default function SequenceSettings({ sequence, onUpdate }) {
         }
     };
 
-    const handleSave = () => {
-        onUpdate({
-            description,
-            emailConfig: { fromName, fromEmail, replyToEmail },
+    const debouncedUpdate = (updates) => {
+        if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current);
+        }
+
+        updateTimeoutRef.current = setTimeout(() => {
+            onUpdate(updates);
+        }, 500);
+    };
+
+    const handleFromNameChange = (value) => {
+        setFromName(value);
+        debouncedUpdate({
+            emailConfig: {
+                ...sequence.emailConfig,
+                fromName: value,
+                fromEmail,
+                replyToEmail,
+            },
         });
-        setHasChanges(false);
+    };
+
+    const handleFromEmailChange = (value) => {
+        setFromEmail(value);
+        debouncedUpdate({
+            emailConfig: {
+                ...sequence.emailConfig,
+                fromName,
+                fromEmail: value,
+                replyToEmail,
+            },
+        });
+    };
+
+    const handleReplyToEmailChange = (value) => {
+        setReplyToEmail(value);
+        debouncedUpdate({
+            emailConfig: {
+                ...sequence.emailConfig,
+                fromName,
+                fromEmail,
+                replyToEmail: value,
+            },
+        });
+    };
+
+    const handleDescriptionChange = (value) => {
+        setDescription(value);
+        debouncedUpdate({
+            description: value,
+        });
     };
 
     const handleUseBrandDefaults = () => {
         if (!brand) return;
-        setFromName(brand.fromName || '');
-        setFromEmail(brand.fromEmail || '');
-        setReplyToEmail(brand.replyToEmail || '');
+
+        const newFromName = brand.fromName || '';
+        const newFromEmail = brand.fromEmail || '';
+        const newReplyToEmail = brand.replyToEmail || '';
+
+        setFromName(newFromName);
+        setFromEmail(newFromEmail);
+        setReplyToEmail(newReplyToEmail);
+
+        onUpdate({
+            emailConfig: {
+                fromName: newFromName,
+                fromEmail: newFromEmail,
+                replyToEmail: newReplyToEmail,
+            },
+        });
     };
 
     const isValidEmail = (email) => {
@@ -69,6 +134,8 @@ export default function SequenceSettings({ sequence, onUpdate }) {
     };
 
     const hasValidConfig = isValidEmail(fromEmail) && isValidEmail(replyToEmail);
+
+    const hasChanges = fromName !== (sequence.emailConfig?.fromName || '') || fromEmail !== (sequence.emailConfig?.fromEmail || '') || replyToEmail !== (sequence.emailConfig?.replyToEmail || '') || description !== (sequence.description || '');
 
     return (
         <div className="sequence-settings">
@@ -80,7 +147,7 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                 <label className="form-label">Description</label>
                 <textarea
                     value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    onChange={(e) => handleDescriptionChange(e.target.value)}
                     placeholder="Describe the purpose of this sequence..."
                     className="form-textarea"
                     rows={3}
@@ -126,7 +193,7 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                     <input
                         type="text"
                         value={fromName}
-                        onChange={(e) => setFromName(e.target.value)}
+                        onChange={(e) => handleFromNameChange(e.target.value)}
                         placeholder="Your Company"
                         className="form-input"
                     />
@@ -139,7 +206,7 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                     <input
                         type="email"
                         value={fromEmail}
-                        onChange={(e) => setFromEmail(e.target.value)}
+                        onChange={(e) => handleFromEmailChange(e.target.value)}
                         placeholder="noreply@example.com"
                         className="form-input"
                     />
@@ -158,7 +225,7 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                     <input
                         type="email"
                         value={replyToEmail}
-                        onChange={(e) => setReplyToEmail(e.target.value)}
+                        onChange={(e) => handleReplyToEmailChange(e.target.value)}
                         placeholder="support@example.com"
                         className="form-input"
                     />
@@ -171,18 +238,13 @@ export default function SequenceSettings({ sequence, onUpdate }) {
                 </div>
             </div>
 
-            {/* Save Bar */}
+            {/* Change indicator */}
             {hasChanges && (
-                <div className="save-bar">
-                    <p>Unsaved</p>
-                    <button
-                        className="button button--primary"
-                        onClick={handleSave}
-                        disabled={!hasValidConfig}
-                    >
-                        <Save size={14} />
-                        Save
-                    </button>
+                <div
+                    className="save-bar"
+                    style={{ opacity: 0.7 }}
+                >
+                    <p>Changes pending...</p>
                 </div>
             )}
         </div>

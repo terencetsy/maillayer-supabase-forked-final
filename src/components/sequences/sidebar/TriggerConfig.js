@@ -27,12 +27,18 @@ export default function TriggerConfig({ sequence, onUpdate }) {
     };
 
     const handleTriggerTypeChange = (type) => {
-        onUpdate({
+        // Update with proper structure
+        const updates = {
             triggerType: type,
             triggerConfig: {
-                contactListIds: type === 'contact_list' ? [] : undefined,
+                ...sequence.triggerConfig,
+                contactListIds: type === 'contact_list' ? sequence.triggerConfig?.contactListIds || [] : undefined,
+                integrationType: type === 'integration' ? sequence.triggerConfig?.integrationType || '' : undefined,
+                integrationEvent: type === 'integration' ? sequence.triggerConfig?.integrationEvent || '' : undefined,
             },
-        });
+        };
+
+        onUpdate(updates);
     };
 
     const handleListToggle = (listId) => {
@@ -57,6 +63,7 @@ export default function TriggerConfig({ sequence, onUpdate }) {
                 <label className="form-label">Trigger Type</label>
                 <div className="trigger-type-options">
                     <button
+                        type="button"
                         className={`trigger-type-option ${sequence.triggerType === 'contact_list' ? 'selected' : ''}`}
                         onClick={() => handleTriggerTypeChange('contact_list')}
                     >
@@ -71,6 +78,7 @@ export default function TriggerConfig({ sequence, onUpdate }) {
                     </button>
 
                     <button
+                        type="button"
                         className={`trigger-type-option ${sequence.triggerType === 'integration' ? 'selected' : ''}`}
                         onClick={() => handleTriggerTypeChange('integration')}
                     >
@@ -127,6 +135,17 @@ export default function TriggerConfig({ sequence, onUpdate }) {
                             })}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Integration Configuration (placeholder) */}
+            {sequence.triggerType === 'integration' && (
+                <div className="form-section">
+                    <label className="form-label">Integration Settings</label>
+                    <p className="helper-text">Configure integration triggers</p>
+                    <div className="empty-state">
+                        <p>Integration configuration coming soon</p>
+                    </div>
                 </div>
             )}
         </div>

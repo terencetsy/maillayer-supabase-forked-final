@@ -1,5 +1,5 @@
 // workers/cron-checker.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const Bull = require('bull');
 const mongoose = require('mongoose');
 const cron = require('node-cron');

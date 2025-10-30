@@ -128,5 +128,22 @@ module.exports = {
             exec_mode: 'fork',
             watch: process.env.NODE_ENV !== 'production' ? ['workers/contact-list-monitor.js'] : false,
         },
+        {
+            name: 'email-sequence-worker',
+            script: 'workers/email-sequence-worker.js',
+            env: {
+                NODE_ENV: process.env.NODE_ENV || 'development',
+                WORKER_DEBUG: process.env.NODE_ENV !== 'production' ? 'true' : 'false',
+            },
+            restart_delay: 3000,
+            max_restarts: 10,
+            log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+            error_file: 'logs/email-sequence-worker-error.log',
+            out_file: 'logs/email-sequence-worker-out.log',
+            merge_logs: true,
+            exec_mode: 'fork',
+            watch: process.env.NODE_ENV !== 'production' ? ['workers/email-sequence-worker.js'] : false,
+            ignore_watch: ['node_modules', 'logs'],
+        },
     ],
 };

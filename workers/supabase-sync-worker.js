@@ -1,5 +1,5 @@
 // workers/supabase-sync-worker.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const { createClient } = require('@supabase/supabase-js');

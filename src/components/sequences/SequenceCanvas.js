@@ -1,5 +1,5 @@
 // src/components/sequences/SequenceCanvas.js
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Plus, Zap } from 'lucide-react';
 import TriggerBlock from './blocks/TriggerBlock';
 import EmailBlock from './blocks/EmailBlock';
@@ -10,9 +10,11 @@ export default function SequenceCanvas({ sequence, onUpdate, selectedStep, setSe
 
     const handleAddEmail = () => {
         const newEmailId = `email-${Date.now()}`;
+        const currentEmails = sequence.emails || [];
+
         const newEmail = {
             id: newEmailId,
-            order: (sequence.emails?.length || 0) + 1,
+            order: currentEmails.length + 1,
             subject: '',
             content: '',
             delayAmount: 1,
@@ -20,11 +22,17 @@ export default function SequenceCanvas({ sequence, onUpdate, selectedStep, setSe
         };
 
         onUpdate({
-            emails: [...(sequence.emails || []), newEmail],
+            emails: [...currentEmails, newEmail],
         });
 
-        setSelectedStep(newEmailId);
+        // Select the new email after a short delay to ensure it's rendered
+        setTimeout(() => {
+            setSelectedStep(newEmailId);
+        }, 100);
     };
+
+    // Ensure emails array exists and is valid
+    const emails = Array.isArray(sequence.emails) ? sequence.emails : [];
 
     return (
         <div
@@ -41,30 +49,38 @@ export default function SequenceCanvas({ sequence, onUpdate, selectedStep, setSe
                     />
 
                     {/* Email Blocks with Connectors */}
-                    {sequence.emails?.map((email, index) => (
-                        <div key={email.id}>
-                            {/* Connector */}
-                            <div className="flow-connector">
-                                <div className="connector-line" />
-                                <div className="connector-time">
-                                    {email.delayAmount} {email.delayUnit}
-                                    {index > 0 ? ' after previous' : ' after trigger'}
-                                </div>
-                            </div>
+                    {emails.map((email, index) => {
+                        // Skip if email doesn't have an ID
+                        if (!email.id) {
+                            console.warn('Email missing ID:', email);
+                            return null;
+                        }
 
-                            {/* Email Block */}
-                            <EmailBlock
-                                email={email}
-                                index={index}
-                                isSelected={selectedStep === email.id}
-                                onClick={() => setSelectedStep(email.id)}
-                                totalEmails={sequence.emails.length}
-                            />
-                        </div>
-                    ))}
+                        return (
+                            <div key={email.id}>
+                                {/* Connector */}
+                                <div className="flow-connector">
+                                    <div className="connector-line" />
+                                    <div className="connector-time">
+                                        {email.delayAmount} {email.delayUnit}
+                                        {index > 0 ? ' after previous' : ' after trigger'}
+                                    </div>
+                                </div>
+
+                                {/* Email Block */}
+                                <EmailBlock
+                                    email={email}
+                                    index={index}
+                                    isSelected={selectedStep === email.id}
+                                    onClick={() => setSelectedStep(email.id)}
+                                    totalEmails={emails.length}
+                                />
+                            </div>
+                        );
+                    })}
 
                     {/* Connector before Add Button */}
-                    {sequence.emails?.length > 0 && (
+                    {emails.length > 0 && (
                         <div className="flow-connector">
                             <div className="connector-line" />
                         </div>

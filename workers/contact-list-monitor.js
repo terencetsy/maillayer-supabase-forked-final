@@ -1,5 +1,6 @@
 // workers/contact-list-monitor.js
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
+require('dotenv').config(); // Fallback
 const mongoose = require('mongoose');
 const cron = require('node-cron');
 const Redis = require('ioredis');
@@ -74,12 +75,33 @@ async function connectToDatabase() {
         const EmailSequenceSchema = new mongoose.Schema(
             {
                 name: String,
+                description: String,
                 brandId: mongoose.Schema.Types.ObjectId,
                 userId: mongoose.Schema.Types.ObjectId,
-                contactListIds: [mongoose.Schema.Types.ObjectId],
-                status: String,
+                triggerType: {
+                    type: String,
+                    enum: ['contact_list', 'integration', 'webhook', 'manual'],
+                    default: 'contact_list',
+                },
+                triggerConfig: {
+                    contactListIds: [mongoose.Schema.Types.ObjectId],
+                    integrationType: String,
+                    integrationEvent: String,
+                    integrationAccountId: String,
+                },
+                emailConfig: {
+                    fromName: String,
+                    fromEmail: String,
+                    replyToEmail: String,
+                },
+                status: {
+                    type: String,
+                    enum: ['active', 'paused', 'archived', 'draft'],
+                    default: 'draft',
+                },
                 emails: [
                     {
+                        id: String,
                         order: Number,
                         subject: String,
                         content: String,
@@ -88,9 +110,9 @@ async function connectToDatabase() {
                     },
                 ],
                 stats: {
-                    totalEnrolled: Number,
-                    totalCompleted: Number,
-                    totalActive: Number,
+                    totalEnrolled: { type: Number, default: 0 },
+                    totalCompleted: { type: Number, default: 0 },
+                    totalActive: { type: Number, default: 0 },
                 },
             },
             { timestamps: true, collection: 'emailsequences' }
@@ -147,14 +169,15 @@ async function checkForNewContacts() {
         const ContactList = mongoose.model('ContactList');
         const SequenceEnrollment = mongoose.model('SequenceEnrollment');
 
-        // Get all active sequences
+        // Get all active sequences with contact_list trigger type
         const activeSequences = await EmailSequence.find({
             status: 'active',
-            contactListIds: { $exists: true, $ne: [] },
+            triggerType: 'contact_list',
+            'triggerConfig.contactListIds': { $exists: true, $ne: [] },
         });
 
         if (activeSequences.length === 0) {
-            console.log('[Contact Monitor] No active sequences found');
+            console.log('[Contact Monitor] No active sequences with contact_list triggers found');
             return;
         }
 
@@ -163,9 +186,11 @@ async function checkForNewContacts() {
         // Get unique list IDs from all sequences
         const listIdsSet = new Set();
         activeSequences.forEach((seq) => {
-            seq.contactListIds.forEach((listId) => {
-                listIdsSet.add(listId.toString());
-            });
+            if (seq.triggerConfig && seq.triggerConfig.contactListIds) {
+                seq.triggerConfig.contactListIds.forEach((listId) => {
+                    listIdsSet.add(listId.toString());
+                });
+            }
         });
 
         const uniqueListIds = Array.from(listIdsSet);
@@ -189,7 +214,7 @@ async function checkForNewContacts() {
                 const checkFrom = contactList.lastCheckedAt || new Date(Date.now() - 5 * 60 * 1000);
                 const checkTo = new Date();
 
-                console.log(`[Contact Monitor] Checking list "${contactList.name}" (${listId}) for contacts added between ${checkFrom.toISOString()} and ${checkTo.toISOString()}`);
+                console.log(`[Contact Monitor] Checking list "${contactList.name}" (${listId}) for contacts added since ${checkFrom.toISOString()}`);
 
                 // Find new contacts added since last check
                 const newContacts = await Contact.find({
@@ -215,7 +240,7 @@ async function checkForNewContacts() {
                 totalNewContactsFound += newContacts.length;
 
                 // Find sequences that target this list
-                const sequencesForList = activeSequences.filter((seq) => seq.contactListIds.some((id) => id.toString() === listId));
+                const sequencesForList = activeSequences.filter((seq) => seq.triggerConfig && seq.triggerConfig.contactListIds && seq.triggerConfig.contactListIds.some((id) => id.toString() === listId));
 
                 console.log(`[Contact Monitor] ${sequencesForList.length} sequences target this list`);
 
@@ -231,6 +256,12 @@ async function checkForNewContacts() {
 
                             if (existingEnrollment) {
                                 console.log(`[Contact Monitor] Contact ${contact.email} already enrolled in sequence "${sequence.name}"`);
+                                continue;
+                            }
+
+                            // Verify sequence has emails
+                            if (!sequence.emails || sequence.emails.length === 0) {
+                                console.log(`[Contact Monitor] Sequence "${sequence.name}" has no emails, skipping`);
                                 continue;
                             }
 
@@ -283,9 +314,9 @@ async function startWorker() {
 
         console.log('[Contact Monitor] Worker started');
 
-        // Run check every 5 minutes
-        // Cron format: */5 * * * * means "every 5 minutes"
-        cron.schedule('*/5 * * * *', async () => {
+        // Run check every 1 minute (changed from 5 minutes for better responsiveness)
+        // Cron format: * * * * * means "every minute"
+        cron.schedule('* * * * *', async () => {
             console.log('[Contact Monitor] Running scheduled check...');
             await checkForNewContacts();
         });
@@ -302,11 +333,11 @@ async function startWorker() {
 // Cleanup old job data
 async function cleanupOldJobs() {
     try {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        await emailSequenceQueue.clean(sevenDaysAgo.getTime(), 'completed');
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        await emailSequenceQueue.clean(sevenDaysAgo, 'completed');
 
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        await emailSequenceQueue.clean(thirtyDaysAgo.getTime(), 'failed');
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        await emailSequenceQueue.clean(thirtyDaysAgo, 'failed');
 
         console.log('[Contact Monitor] Cleaned up old queue jobs');
     } catch (error) {

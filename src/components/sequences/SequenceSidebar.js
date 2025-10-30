@@ -43,6 +43,12 @@ export default function SequenceSidebar({ sequence, onUpdate, selectedStep, setS
         await onToggleActive();
     };
 
+    const handleSaveClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSave();
+    };
+
     const canActivate = sequence.status !== 'active' && !validateForActivation();
 
     const renderContent = () => {
@@ -82,6 +88,12 @@ export default function SequenceSidebar({ sequence, onUpdate, selectedStep, setS
         );
     };
 
+    const getSaveButtonText = () => {
+        if (saving) return 'Saving...';
+        if (hasUnsavedChanges) return 'Save';
+        return 'Saved';
+    };
+
     return (
         <div className="sequence-sidebar">
             {/* Compact Header */}
@@ -103,18 +115,24 @@ export default function SequenceSidebar({ sequence, onUpdate, selectedStep, setS
                     <div className="sequence-meta">
                         <span className="email-count">{sequence.emails?.length || 0} emails</span>
                     </div>
-                    <div onClick={() => setSelectedStep('settings')}>
+                    <div
+                        onClick={() => setSelectedStep('settings')}
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                        title="Settings"
+                    >
                         <Edit01 />
                     </div>
                     <button
+                        type="button"
                         className="button button--secondary"
-                        onClick={onSave}
+                        onClick={handleSaveClick}
                         disabled={saving || !hasUnsavedChanges}
                     >
                         <Save size={15} />
-                        {hasUnsavedChanges ? 'Save' : 'Saved'}
+                        {getSaveButtonText()}
                     </button>
                     <button
+                        type="button"
                         className={`button ${sequence.status === 'active' ? 'button--secondary' : 'button--primary'}`}
                         onClick={handleToggleClick}
                         disabled={sequence.status !== 'active' && !canActivate}
@@ -134,8 +152,6 @@ export default function SequenceSidebar({ sequence, onUpdate, selectedStep, setS
                     </button>
                 </div>
             </div>
-
-            {/* Compact Action Buttons */}
 
             {/* Activation Error */}
             {activationError && (

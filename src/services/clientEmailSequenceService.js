@@ -1,95 +1,121 @@
 // src/services/clientEmailSequenceService.js
-export async function getEmailSequences(brandId) {
-    const response = await fetch(`/api/brands/${brandId}/email-sequences`, {
-        credentials: 'same-origin',
-    });
+export async function updateEmailSequence(brandId, sequenceId, updateData) {
+    try {
+        console.log('Client sending update:', updateData); // Debug log
 
-    if (!response.ok) {
+        const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(updateData),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to update sequence');
+        }
+
         const data = await response.json();
-        throw new Error(data.message || 'Failed to fetch email sequences');
-    }
+        console.log('Client received response:', data); // Debug log
 
-    return response.json();
+        return data;
+    } catch (error) {
+        console.error('Error updating sequence:', error);
+        throw error;
+    }
+}
+
+export async function getEmailSequences(brandId) {
+    try {
+        const response = await fetch(`/api/brands/${brandId}/email-sequences`, {
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch sequences');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching sequences:', error);
+        throw error;
+    }
 }
 
 export async function getEmailSequence(brandId, sequenceId) {
-    const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
-        credentials: 'same-origin',
-    });
+    try {
+        const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
+            credentials: 'same-origin',
+        });
 
-    if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to fetch email sequence');
+        if (!response.ok) {
+            throw new Error('Failed to fetch sequence');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching sequence:', error);
+        throw error;
     }
-
-    return response.json();
 }
 
 export async function createEmailSequence(brandId, sequenceData) {
-    const response = await fetch(`/api/brands/${brandId}/email-sequences`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sequenceData),
-        credentials: 'same-origin',
-    });
+    try {
+        const response = await fetch(`/api/brands/${brandId}/email-sequences`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(sequenceData),
+        });
 
-    if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to create email sequence');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to create sequence');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error creating sequence:', error);
+        throw error;
     }
-
-    return response.json();
-}
-
-export async function updateEmailSequence(brandId, sequenceId, sequenceData) {
-    const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sequenceData),
-        credentials: 'same-origin',
-    });
-
-    if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update email sequence');
-    }
-
-    return response.json();
 }
 
 export async function deleteEmailSequence(brandId, sequenceId) {
-    const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
-        method: 'DELETE',
-        credentials: 'same-origin',
-    });
+    try {
+        const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}`, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+        });
 
-    if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to delete email sequence');
+        if (!response.ok) {
+            throw new Error('Failed to delete sequence');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error deleting sequence:', error);
+        throw error;
     }
-
-    return response.json();
 }
 
 export async function getSequenceEnrollments(brandId, sequenceId, options = {}) {
-    const params = new URLSearchParams({
-        page: options.page || 1,
-        limit: options.limit || 50,
-        status: options.status || '',
-    });
+    try {
+        const params = new URLSearchParams(options);
+        const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}/enrollments?${params}`, {
+            credentials: 'same-origin',
+        });
 
-    const response = await fetch(`/api/brands/${brandId}/email-sequences/${sequenceId}/enrollments?${params}`, {
-        credentials: 'same-origin',
-    });
+        if (!response.ok) {
+            throw new Error('Failed to fetch enrollments');
+        }
 
-    if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to fetch enrollments');
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching enrollments:', error);
+        throw error;
     }
-
-    return response.json();
 }

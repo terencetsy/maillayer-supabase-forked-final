@@ -44,22 +44,33 @@ export default async function handler(req, res) {
 
         // PUT - Update sequence
         if (req.method === 'PUT') {
-            const { name, description, contactListIds, emails, status } = req.body;
+            const { name, description, triggerType, triggerConfig, emailConfig, emails, status, canvasData } = req.body;
+
+            console.log('API received update request:', req.body); // Debug log
 
             const updateData = {};
-            if (name) updateData.name = name;
+
+            // Only add fields that are provided
+            if (name !== undefined) updateData.name = name;
             if (description !== undefined) updateData.description = description;
-            if (contactListIds) updateData.contactListIds = contactListIds;
-            if (emails) updateData.emails = emails;
-            if (status) updateData.status = status;
+            if (triggerType !== undefined) updateData.triggerType = triggerType;
+            if (triggerConfig !== undefined) updateData.triggerConfig = triggerConfig;
+            if (emailConfig !== undefined) updateData.emailConfig = emailConfig;
+            if (emails !== undefined) updateData.emails = emails;
+            if (status !== undefined) updateData.status = status;
+            if (canvasData !== undefined) updateData.canvasData = canvasData;
 
-            const success = await updateEmailSequence(sequenceId, userId, updateData);
+            console.log('Updating sequence with data:', updateData); // Debug log
 
-            if (!success) {
-                return res.status(404).json({ message: 'Sequence not found' });
+            const updatedSequence = await updateEmailSequence(sequenceId, userId, updateData);
+
+            if (!updatedSequence) {
+                return res.status(404).json({ message: 'Sequence not found or update failed' });
             }
 
-            return res.status(200).json({ message: 'Sequence updated successfully' });
+            console.log('Sequence updated successfully:', updatedSequence); // Debug log
+
+            return res.status(200).json(updatedSequence);
         }
 
         // DELETE - Delete sequence

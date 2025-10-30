@@ -1,6 +1,6 @@
 // workers/modelAdapter.js
 // This adapter loads ES Module models in a CommonJS environment
-require('dotenv').config();
+require('dotenv').config({ path: '.env.local' });
 const mongoose = require('mongoose');
 
 // Connect to MongoDB
