@@ -67,8 +67,6 @@ export default async function handler(req, res) {
                 return res.status(404).json({ message: 'Sequence not found or update failed' });
             }
 
-            console.log('Sequence updated successfully:', updatedSequence); // Debug log
-
             return res.status(200).json(updatedSequence);
         }
 

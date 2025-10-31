@@ -496,14 +496,14 @@ export default function SequenceBuilder({ sequence, onUpdate, onSave, onToggleAc
                     })}
 
                     {/* Add Email Button */}
-                    {sequence.emails && sequence.emails.length > 0 && nodePositions[sequence.emails[sequence.emails.length - 1].id] && (
+                    {nodePositions['trigger'] && (
                         <button
                             className="add-node-btn"
                             onClick={handleAddEmail}
                             style={{
                                 position: 'absolute',
-                                left: `${nodePositions[sequence.emails[sequence.emails.length - 1].id].x + 100}px`,
-                                top: `${nodePositions[sequence.emails[sequence.emails.length - 1].id].y + 100}px`,
+                                left: sequence.emails && sequence.emails.length > 0 && nodePositions[sequence.emails[sequence.emails.length - 1].id] ? `${nodePositions[sequence.emails[sequence.emails.length - 1].id].x + 100}px` : `${nodePositions['trigger'].x + 100}px`,
+                                top: sequence.emails && sequence.emails.length > 0 && nodePositions[sequence.emails[sequence.emails.length - 1].id] ? `${nodePositions[sequence.emails[sequence.emails.length - 1].id].y + 100}px` : `${nodePositions['trigger'].y + 160}px`,
                             }}
                         >
                             <PlusSign size={20} />

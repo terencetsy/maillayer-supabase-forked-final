@@ -122,8 +122,6 @@ export async function updateEmailSequence(sequenceId, userId, updateData) {
         return null;
     }
 
-    console.log('Sequence updated successfully:', result); // Debug log
-
     return result;
 }
 export async function deleteEmailSequence(sequenceId, userId) {
