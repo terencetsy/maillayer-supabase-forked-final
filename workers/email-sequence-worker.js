@@ -6,7 +6,7 @@ const Redis = require('ioredis');
 const crypto = require('crypto');
 const cheerio = require('cheerio');
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
-const { logSequenceEmail } = require('@/services/sequenceLogService');
+const { logSequenceEmail } = require('../src/services/sequenceLogService');
 
 // Get Redis URL
 function getRedisUrl() {
