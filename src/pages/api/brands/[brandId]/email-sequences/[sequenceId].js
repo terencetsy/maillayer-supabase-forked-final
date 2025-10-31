@@ -44,9 +44,7 @@ export default async function handler(req, res) {
 
         // PUT - Update sequence
         if (req.method === 'PUT') {
-            const { name, description, triggerType, triggerConfig, emailConfig, emails, status, canvasData } = req.body;
-
-            console.log('API received update request:', req.body); // Debug log
+            const { name, description, triggerType, triggerConfig, emailConfig, emails, status, canvasData, canvasPositions } = req.body;
 
             const updateData = {};
 
@@ -59,6 +57,7 @@ export default async function handler(req, res) {
             if (emails !== undefined) updateData.emails = emails;
             if (status !== undefined) updateData.status = status;
             if (canvasData !== undefined) updateData.canvasData = canvasData;
+            if (canvasPositions !== undefined) updateData.canvasPositions = canvasPositions;
 
             console.log('Updating sequence with data:', updateData); // Debug log
 

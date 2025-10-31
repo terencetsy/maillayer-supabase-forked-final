@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
-import SequenceCanvas from '@/components/sequences/SequenceCanvas';
-import SequenceSidebar from '@/components/sequences/SequenceSidebar';
+import SequenceBuilder from '@/components/sequences/SequenceBuilder';
 import { getEmailSequence, updateEmailSequence } from '@/services/clientEmailSequenceService';
 
 export default function SequenceDesign() {
@@ -16,7 +15,6 @@ export default function SequenceDesign() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
-    const [selectedStep, setSelectedStep] = useState('trigger');
 
     const saveTimeoutRef = useRef(null);
     const isMountedRef = useRef(true);
@@ -43,7 +41,6 @@ export default function SequenceDesign() {
         try {
             const data = await getEmailSequence(id, sequenceId);
 
-            // Ensure all emails have IDs
             if (data.emails) {
                 data.emails = data.emails.map((email, index) => ({
                     ...email,
@@ -74,7 +71,6 @@ export default function SequenceDesign() {
 
             const updated = { ...prev };
 
-            // If updating emails, ensure they have IDs and orders
             if (updates.emails) {
                 updated.emails = updates.emails.map((email, index) => ({
                     ...email,
@@ -82,7 +78,6 @@ export default function SequenceDesign() {
                     order: email.order || index + 1,
                 }));
             } else {
-                // Merge other updates
                 Object.assign(updated, updates);
             }
 
@@ -93,16 +88,13 @@ export default function SequenceDesign() {
     const hasUnsavedChanges = useCallback(() => {
         if (!sequence || !originalSequence) return false;
 
-        // Compare relevant fields only
         const compareFields = (a, b) => {
             if (!a || !b) return false;
 
-            // Compare basic fields
             if (a.name !== b.name || a.description !== b.description || a.triggerType !== b.triggerType || a.status !== b.status) {
                 return true;
             }
 
-            // Compare emails
             if (a.emails?.length !== b.emails?.length) return true;
 
             for (let i = 0; i < (a.emails?.length || 0); i++) {
@@ -114,12 +106,10 @@ export default function SequenceDesign() {
                 }
             }
 
-            // Compare trigger config
             if (JSON.stringify(a.triggerConfig) !== JSON.stringify(b.triggerConfig)) {
                 return true;
             }
 
-            // Compare email config
             if (JSON.stringify(a.emailConfig) !== JSON.stringify(b.emailConfig)) {
                 return true;
             }
@@ -130,8 +120,6 @@ export default function SequenceDesign() {
         return compareFields(sequence, originalSequence);
     }, [sequence, originalSequence]);
 
-    // In the handleSave function, update the dataToSave section:
-
     const handleSave = useCallback(async () => {
         if (!hasUnsavedChanges() || isSaving) {
             return;
@@ -141,7 +129,6 @@ export default function SequenceDesign() {
             setIsSaving(true);
             setError('');
 
-            // Prepare data for save - ensure all fields are included
             const dataToSave = {
                 name: sequence.name,
                 description: sequence.description,
@@ -161,12 +148,8 @@ export default function SequenceDesign() {
                 status: sequence.status,
             };
 
-            console.log('Saving sequence with data:', dataToSave); // Debug log
-
-            // Save without updating state immediately
             await updateEmailSequence(id, sequenceId, dataToSave);
 
-            // Only update the originalSequence to mark as saved
             if (isMountedRef.current) {
                 setOriginalSequence(JSON.parse(JSON.stringify(sequence)));
                 setIsSaving(false);
@@ -181,7 +164,6 @@ export default function SequenceDesign() {
     }, [sequence, hasUnsavedChanges, isSaving, id, sequenceId]);
 
     const handleToggleActive = async () => {
-        // Save changes first if there are any
         if (hasUnsavedChanges() && !isSaving) {
             await handleSave();
         }
@@ -191,7 +173,6 @@ export default function SequenceDesign() {
         try {
             await updateEmailSequence(id, sequenceId, { status: newStatus });
 
-            // Only update the status in state, don't refetch everything
             if (isMountedRef.current) {
                 setSequence((prev) => ({ ...prev, status: newStatus }));
                 setOriginalSequence((prev) => ({ ...prev, status: newStatus }));
@@ -204,7 +185,6 @@ export default function SequenceDesign() {
         }
     };
 
-    // Auto-save with debounce
     useEffect(() => {
         if (hasUnsavedChanges() && !isSaving) {
             if (saveTimeoutRef.current) {
@@ -213,7 +193,7 @@ export default function SequenceDesign() {
 
             saveTimeoutRef.current = setTimeout(() => {
                 handleSave();
-            }, 3000); // Auto-save after 3 seconds of no changes
+            }, 3000);
         }
 
         return () => {
@@ -223,7 +203,6 @@ export default function SequenceDesign() {
         };
     }, [sequence, hasUnsavedChanges, isSaving, handleSave]);
 
-    // Warn before leaving with unsaved changes
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             if (hasUnsavedChanges()) {
@@ -238,7 +217,7 @@ export default function SequenceDesign() {
 
     if (isLoading) {
         return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fafafa' }}>
                 <div style={{ textAlign: 'center' }}>
                     <div
                         style={{
@@ -286,89 +265,17 @@ export default function SequenceDesign() {
                     }
                 }
             `}</style>
-            <div style={{ display: 'grid', height: '100vh', gridTemplateColumns: '50% 50%', backgroundColor: '#f6f6f6' }}>
-                {error && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: 20,
-                            right: 20,
-                            background: '#fee',
-                            border: '1px solid #fcc',
-                            padding: '12px 16px',
-                            borderRadius: '6px',
-                            zIndex: 1000,
-                            maxWidth: '400px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span>{error}</span>
-                            <button
-                                onClick={() => setError('')}
-                                style={{
-                                    marginLeft: 10,
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '20px',
-                                    color: '#c00',
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {isSaving && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: 20,
-                            right: 20,
-                            background: '#fff',
-                            border: '1px solid #e0e0e0',
-                            padding: '12px 16px',
-                            borderRadius: '6px',
-                            zIndex: 1000,
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: '16px',
-                                height: '16px',
-                                border: '2px solid #f0f0f0',
-                                borderTopColor: '#1a1a1a',
-                                borderRadius: '50%',
-                                animation: 'spin 0.8s linear infinite',
-                            }}
-                        ></div>
-                        <span>Saving...</span>
-                    </div>
-                )}
-
-                <SequenceCanvas
-                    sequence={sequence}
-                    onUpdate={handleUpdate}
-                    selectedStep={selectedStep}
-                    setSelectedStep={setSelectedStep}
-                />
-                <SequenceSidebar
-                    sequence={sequence}
-                    onUpdate={handleUpdate}
-                    selectedStep={selectedStep}
-                    setSelectedStep={setSelectedStep}
-                    onSave={handleSave}
-                    onToggleActive={handleToggleActive}
-                    saving={isSaving}
-                    hasUnsavedChanges={hasUnsavedChanges()}
-                />
-            </div>
+            <SequenceBuilder
+                sequence={sequence}
+                onUpdate={handleUpdate}
+                onSave={handleSave}
+                onToggleActive={handleToggleActive}
+                isSaving={isSaving}
+                hasUnsavedChanges={hasUnsavedChanges()}
+                error={error}
+                onClearError={() => setError('')}
+                brandId={id}
+            />
         </>
     );
 }

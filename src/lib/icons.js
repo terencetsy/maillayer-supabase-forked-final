@@ -591,3 +591,159 @@ export const MailOutgoing = (props) => (
         </g>
     </svg>
 );
+
+export const SaveFloppy = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <g
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+        >
+            <path d="M21.25 9.16v7.987a4.1 4.1 0 0 1-1.204 2.901a4.113 4.113 0 0 1-2.906 1.202H6.86a4.113 4.113 0 0 1-2.906-1.202a4.1 4.1 0 0 1-1.204-2.901V6.853a4.1 4.1 0 0 1 1.204-2.901A4.113 4.113 0 0 1 6.86 2.75h8.35a3.004 3.004 0 0 1 2.25.998l3 3.415c.501.545.783 1.256.79 1.997"></path>
+            <path d="M7 21.22v-5.241a1.995 1.995 0 0 1 2-1.997h6a2.002 2.002 0 0 1 2 1.997v5.241M15.8 2.81v4.183a1.526 1.526 0 0 1-1.52 1.528H9.72A1.531 1.531 0 0 1 8.2 6.993V2.75m1.946 15.108h3.708"></path>
+        </g>
+    </svg>
+);
+
+export const Play = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M18.89 12.846c-.353 1.343-2.023 2.292-5.364 4.19c-3.23 1.835-4.845 2.752-6.146 2.384a3.25 3.25 0 0 1-1.424-.841C5 17.614 5 15.743 5 12s0-5.614.956-6.579a3.25 3.25 0 0 1 1.424-.84c1.301-.37 2.916.548 6.146 2.383c3.34 1.898 5.011 2.847 5.365 4.19a3.3 3.3 0 0 1 0 1.692"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const Pause = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M4 7c0-1.414 0-2.121.44-2.56C4.878 4 5.585 4 7 4s2.121 0 2.56.44C10 4.878 10 5.585 10 7v10c0 1.414 0 2.121-.44 2.56C9.122 20 8.415 20 7 20s-2.121 0-2.56-.44C4 19.122 4 18.415 4 17zm10 0c0-1.414 0-2.121.44-2.56C14.878 4 15.585 4 17 4s2.121 0 2.56.44C20 4.878 20 5.585 20 7v10c0 1.414 0 2.121-.44 2.56c-.439.44-1.146.44-2.56.44s-2.121 0-2.56-.44C14 19.122 14 18.415 14 17z"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const ArrowLeft02 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M4 12h16M9 17s-5-3.682-5-5s5-5 5-5"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const Close = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 20 20"
+        {...props}
+    >
+        <path
+            fill="#000000"
+            d="M10 8.586L2.929 1.515L1.515 2.929L8.586 10l-7.071 7.071l1.414 1.414L10 11.414l7.071 7.071l1.414-1.414L11.414 10l7.071-7.071l-1.414-1.414L10 8.586z"
+        ></path>
+    </svg>
+);
+
+export const LeftToRightListTriangle = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M11 5.5h10M5.4 16.893C6.467 17.607 7 17.964 7 18.5s-.533.893-1.6 1.607c-1.067.715-1.6 1.072-2 .804S3 19.93 3 18.5s0-2.143.4-2.411s.933.09 2 .804m0-13C6.467 4.607 7 4.964 7 5.5s-.533.893-1.6 1.607c-1.067.715-1.6 1.072-2 .804S3 6.93 3 5.5s0-2.143.4-2.411s.933.09 2 .804M11 12h10m-10 6.5h10"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const Zap = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M8.628 12.674H8.17c-1.484 0-2.225 0-2.542-.49c-.316-.489-.015-1.17.588-2.533l1.812-4.098c.548-1.239.822-1.859 1.353-2.206S10.586 3 11.935 3h2.09c1.638 0 2.458 0 2.767.535c.309.536-.098 1.25-.91 2.681l-1.073 1.886c-.404.711-.606 1.066-.603 1.358c.003.378.205.726.53.917c.25.147.657.147 1.471.147c1.03 0 1.545 0 1.813.178c.349.232.531.646.467 1.061c-.049.32-.395.703-1.088 1.469l-5.535 6.12c-1.087 1.203-1.63 1.804-1.996 1.613c-.365-.19-.19-.983.16-2.569l.688-3.106c.267-1.208.4-1.812.08-2.214c-.322-.402-.937-.402-2.168-.402"
+            color="currentColor"
+        ></path>
+    </svg>
+);
+
+export const Alert02 = (props) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1em"
+        height="1em"
+        viewBox="0 0 24 24"
+        {...props}
+    >
+        <path
+            fill="none"
+            stroke="#000000"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M5.322 9.683c2.413-4.271 3.62-6.406 5.276-6.956a4.45 4.45 0 0 1 2.804 0c1.656.55 2.863 2.685 5.276 6.956c2.414 4.27 3.62 6.406 3.259 8.146c-.2.958-.69 1.826-1.402 2.48C19.241 21.5 16.827 21.5 12 21.5s-7.241 0-8.535-1.19a4.66 4.66 0 0 1-1.402-2.48c-.362-1.74.845-3.876 3.259-8.147M11.992 16h.009M12 13V9"
+            color="currentColor"
+        ></path>
+    </svg>
+);

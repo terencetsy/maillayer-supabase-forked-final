@@ -96,6 +96,14 @@ const EmailSequenceSchema = new mongoose.Schema(
                 y: { type: Number, default: 0 },
             },
         },
+        canvasPositions: {
+            type: Map,
+            of: {
+                x: Number,
+                y: Number,
+            },
+            default: {},
+        },
         stats: {
             totalEnrolled: {
                 type: Number,

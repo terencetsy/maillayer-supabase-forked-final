@@ -1,6 +1,7 @@
 import { SessionProvider } from 'next-auth/react';
 import Head from 'next/head';
 import '../styles/globals.scss';
+import '@/styles/sequence-builder.scss';
 import config from '@/lib/config';
 
 if (typeof window === 'undefined' && !process.env.NEXTAUTH_URL) {
