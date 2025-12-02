@@ -114,23 +114,15 @@ export const getCampaignStats = async (campaignId) => {
             },
         ]);
 
-        // Get unsubscribe events - these might be stored in Contact model rather than tracking events
-        const unsubscribeStats = await TrackingModel.aggregate([
-            { $match: { eventType: 'unsubscribe' } },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: 1 },
-                    unique: { $addToSet: '$email' },
-                },
-            },
-        ]);
-
-        // Also check contacts that unsubscribed from this campaign
-        const unsubscribedContactsCount = await Contact.countDocuments({
+        // Get unsubscribe count from contacts - this is the SOURCE OF TRUTH
+        // We count contacts that unsubscribed from this specific campaign
+        const unsubscribedContacts = await Contact.find({
             unsubscribedFromCampaign: new mongoose.Types.ObjectId(campaignId),
             isUnsubscribed: true,
-        });
+        }).select('email');
+
+        // Get unique emails from unsubscribed contacts
+        const uniqueUnsubscribedEmails = [...new Set(unsubscribedContacts.map((c) => c.email))];
 
         // Calculate total and unique counts for each event type
         const open =
@@ -165,19 +157,11 @@ export const getCampaignStats = async (campaignId) => {
                   }
                 : { total: 0, unique: 0 };
 
-        // Get unsubscribe counts from both tracking events and the campaign stats
-        const trackingUnsubscribes = unsubscribeStats.length > 0 ? unsubscribeStats[0].total : 0;
-        const contactModelUnsubscribes = unsubscribedContactsCount;
-        // Also include the count from campaign stats as a third source
-        const campaignUnsubscribes = campaign.stats?.unsubscribes || 0;
-
-        // For unique counts, consider both tracking events and contact model counts
-        const uniqueUnsubscribes = (unsubscribeStats.length > 0 ? unsubscribeStats[0].unique.length : 0) + contactModelUnsubscribes;
-
+        // Use contacts as the single source of truth for unsubscribes
+        // This avoids double counting from tracking events + contact model
         const unsubscribed = {
-            // Take the maximum value from our different sources to ensure we don't undercount
-            total: Math.max(trackingUnsubscribes + contactModelUnsubscribes, campaignUnsubscribes),
-            unique: uniqueUnsubscribes,
+            total: uniqueUnsubscribedEmails.length,
+            unique: uniqueUnsubscribedEmails.length,
         };
 
         // Calculate rates
