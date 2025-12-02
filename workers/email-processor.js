@@ -6,8 +6,7 @@ const crypto = require('crypto');
 const { RateLimiter } = require('limiter');
 const cheerio = require('cheerio');
 const Redis = require('ioredis');
-const { SESClient, SendEmailCommand, GetSendQuotaCommand } = require('@aws-sdk/client-ses');
-const { SNSClient } = require('@aws-sdk/client-sns');
+const { SESClient, SendRawEmailCommand, GetSendQuotaCommand } = require('@aws-sdk/client-ses');
 
 // Load our CommonJS compatible config
 const config = require('../src/lib/configCommonJS');
@@ -393,12 +392,13 @@ function processHtml(html, campaignId, contactId, email, trackingDomain = '', br
     // Generate unsubscribe token
     const unsubscribeToken = generateUnsubscribeToken(contactId, brandId, campaignId);
     const unsubscribeUrl = `${config.baseUrl}/unsubscribe/${unsubscribeToken}`;
+
     // Create unsubscribe footer
     const unsubscribeFooter = `
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center;">
-                  <p>If you no longer wish to receive emails from us, you can <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">unsubscribe here</a>.</p>
-              </div>
-          `;
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center;">
+            <p>If you no longer wish to receive emails from us, you can <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">unsubscribe here</a>.</p>
+        </div>
+    `;
 
     // Add unsubscribe footer before the end of the body
     $('body').append(unsubscribeFooter);
@@ -455,6 +455,68 @@ function decryptData(encryptedText, secretKey) {
         console.error('Decryption error:', error);
         return encryptedText;
     }
+}
+
+// ===== RFC 8058 ONE-CLICK UNSUBSCRIBE HELPERS =====
+
+// Generate List-Unsubscribe headers for RFC 8058 compliance
+function generateListUnsubscribeHeaders(contactId, brandId, campaignId, baseUrl) {
+    const token = generateUnsubscribeToken(contactId, brandId, campaignId);
+    const oneClickUrl = `${baseUrl}/api/unsubscribe/one-click?token=${encodeURIComponent(token)}`;
+
+    return {
+        listUnsubscribe: `<${oneClickUrl}>`,
+        listUnsubscribePost: 'List-Unsubscribe=One-Click',
+    };
+}
+
+// Build raw MIME email with custom headers including List-Unsubscribe
+function buildRawEmail({ from, to, replyTo, subject, htmlContent, textContent, listUnsubscribe, listUnsubscribePost, configurationSet, tags }) {
+    const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+    // Build headers
+    let rawEmail = '';
+    rawEmail += `From: ${from}\r\n`;
+    rawEmail += `To: ${to}\r\n`;
+    rawEmail += `Reply-To: ${replyTo}\r\n`;
+    rawEmail += `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=\r\n`;
+    rawEmail += `MIME-Version: 1.0\r\n`;
+    rawEmail += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
+
+    // Add List-Unsubscribe headers for RFC 8058 compliance (Google/Yahoo requirement)
+    rawEmail += `List-Unsubscribe: ${listUnsubscribe}\r\n`;
+    rawEmail += `List-Unsubscribe-Post: ${listUnsubscribePost}\r\n`;
+
+    // Add custom headers for SES tracking
+    if (tags && tags.length > 0) {
+        const tagString = tags.map((t) => `${t.Name}=${t.Value}`).join(', ');
+        rawEmail += `X-SES-MESSAGE-TAGS: ${tagString}\r\n`;
+    }
+
+    if (configurationSet) {
+        rawEmail += `X-SES-CONFIGURATION-SET: ${configurationSet}\r\n`;
+    }
+
+    rawEmail += `\r\n`;
+
+    // Text part
+    rawEmail += `--${boundary}\r\n`;
+    rawEmail += `Content-Type: text/plain; charset=UTF-8\r\n`;
+    rawEmail += `Content-Transfer-Encoding: 7bit\r\n`;
+    rawEmail += `\r\n`;
+    rawEmail += `${textContent}\r\n`;
+
+    // HTML part
+    rawEmail += `--${boundary}\r\n`;
+    rawEmail += `Content-Type: text/html; charset=UTF-8\r\n`;
+    rawEmail += `Content-Transfer-Encoding: 7bit\r\n`;
+    rawEmail += `\r\n`;
+    rawEmail += `${htmlContent}\r\n`;
+
+    // End boundary
+    rawEmail += `--${boundary}--\r\n`;
+
+    return rawEmail;
 }
 
 // Only create queues after successful DB connection and model initialization
@@ -555,7 +617,7 @@ async function initializeQueues() {
         }
     });
 
-    // Add this processor in your workers/email-processor.js
+    // ===== WARMUP BATCH PROCESSOR WITH ONE-CLICK UNSUBSCRIBE =====
     schedulerQueue.process('process-warmup-batch', async (job) => {
         try {
             const { campaignId, brandId, userId, contactListIds, fromName, fromEmail, replyTo, subject, batchSize, warmupStage } = job.data;
@@ -642,6 +704,9 @@ async function initializeQueues() {
             let failureCount = 0;
             const deliveryEvents = [];
 
+            // Define tracking domain
+            const trackingDomain = config.trackingDomain;
+
             // Process each contact in this batch
             for (const contact of contacts) {
                 // Wait for rate limiter token
@@ -649,47 +714,46 @@ async function initializeQueues() {
 
                 try {
                     // Add tracking to HTML content
-                    const trackingDomain = config.trackingDomain;
                     const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
 
                     // Extract plain text
                     const textContent = extractTextFromHtml(processedHtml);
 
-                    // Send email
+                    // Generate List-Unsubscribe headers for RFC 8058 compliance
+                    const unsubscribeHeaders = generateListUnsubscribeHeaders(contact._id.toString(), brandId.toString(), campaignId.toString(), config.baseUrl);
+
+                    // Build recipient address
+                    const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
+
+                    // Build raw email with List-Unsubscribe headers
+                    const rawEmailContent = buildRawEmail({
+                        from: `${fromName} <${fromEmail}>`,
+                        to: toAddress,
+                        replyTo: replyTo || fromEmail,
+                        subject: subject || campaign.subject,
+                        htmlContent: processedHtml,
+                        textContent: textContent || 'Empty campaign content',
+                        listUnsubscribe: unsubscribeHeaders.listUnsubscribe,
+                        listUnsubscribePost: unsubscribeHeaders.listUnsubscribePost,
+                        configurationSet: brand.sesConfigurationSet,
+                        tags: [
+                            { Name: 'campaignId', Value: campaignId.toString() },
+                            { Name: 'contactId', Value: contact._id.toString() },
+                            { Name: 'warmupStage', Value: warmupStage.toString() },
+                        ],
+                    });
+
+                    // Send raw email
                     const result = await sesClient.send(
-                        new SendEmailCommand({
-                            Source: `${fromName} <${fromEmail}>`,
-                            Destination: {
-                                ToAddresses: [contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email],
+                        new SendRawEmailCommand({
+                            RawMessage: {
+                                Data: Buffer.from(rawEmailContent),
                             },
-                            Message: {
-                                Subject: {
-                                    Data: subject || campaign.subject,
-                                },
-                                Body: {
-                                    Html: {
-                                        Data: processedHtml,
-                                    },
-                                    Text: {
-                                        Data: textContent || 'Empty campaign content',
-                                    },
-                                },
-                            },
-                            ReplyToAddresses: [replyTo || fromEmail],
                             ConfigurationSetName: brand.sesConfigurationSet,
                             Tags: [
-                                {
-                                    Name: 'campaignId',
-                                    Value: campaignId.toString(),
-                                },
-                                {
-                                    Name: 'contactId',
-                                    Value: contact._id.toString(),
-                                },
-                                {
-                                    Name: 'warmupStage',
-                                    Value: warmupStage.toString(),
-                                },
+                                { Name: 'campaignId', Value: campaignId.toString() },
+                                { Name: 'contactId', Value: contact._id.toString() },
+                                { Name: 'warmupStage', Value: warmupStage.toString() },
                             ],
                         })
                     );
@@ -703,6 +767,7 @@ async function initializeQueues() {
                         metadata: {
                             messageId: result.MessageId,
                             warmupStage: warmupStage,
+                            hasOneClickUnsubscribe: true,
                         },
                     });
 
@@ -746,6 +811,7 @@ async function initializeQueues() {
             // Calculate next batch
             const updatedCampaign = await Campaign.findById(campaignId);
             console.log(`Updated campaign stats:`, updatedCampaign);
+
             // Check if we have more contacts to process
             const remainingContacts = updatedCampaign.stats.recipients - updatedCampaign.stats.processed;
 
@@ -826,7 +892,7 @@ async function initializeQueues() {
         }
     });
 
-    // Complete send-campaign handler with email tracking
+    // ===== SEND CAMPAIGN PROCESSOR WITH ONE-CLICK UNSUBSCRIBE =====
     emailCampaignQueue.process('send-campaign', async (job) => {
         const { campaignId, brandId, userId, contactListIds, fromName, fromEmail, replyTo, subject } = job.data;
         try {
@@ -866,6 +932,7 @@ async function initializeQueues() {
             if (!brand) {
                 throw new Error(`Brand not found: ${brandId}`);
             }
+
             // Check if brand has SES credentials
             if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
                 throw new Error('AWS SES credentials not configured for this brand');
@@ -883,7 +950,6 @@ async function initializeQueues() {
             job.progress(15);
 
             // Create tracking model for this campaign
-            // This ensures the collection exists before we start sending emails
             createTrackingModel(campaignId);
 
             // Define tracking domain for links and pixels
@@ -912,12 +978,12 @@ async function initializeQueues() {
                 }
 
                 // Store the max send rate for rate limiting
-                const maxSendRate = quotaResponse.MaxSendRate || 10; // Default SES rate limit is 10/sec
+                const maxSendRate = quotaResponse.MaxSendRate || 10;
 
                 job.progress(20);
 
                 // Calculate optimal batch size based on SES send rate
-                const BATCH_SIZE = Math.max(10, Math.min(100, maxSendRate * 2)); // 2x the sending rate, min 10, max 100
+                const BATCH_SIZE = Math.max(10, Math.min(100, maxSendRate * 2));
                 console.log(`Using batch size of ${BATCH_SIZE} emails per batch`);
 
                 // Process each contact list
@@ -940,7 +1006,7 @@ async function initializeQueues() {
                     console.log(`Processing list ${listId} with ${totalContacts} contacts`);
 
                     // Process in chunks to avoid loading all contacts into memory
-                    const CHUNK_SIZE = 1000; // Process 1000 contacts at a time from DB
+                    const CHUNK_SIZE = 1000;
                     let startIndex = 0;
 
                     // If this is the list we were processing before, start from lastProcessedContactIndex
@@ -955,7 +1021,7 @@ async function initializeQueues() {
                             status: 'active',
                             isUnsubscribed: { $in: [false, null] },
                         })
-                            .sort({ _id: 1 }) // Ensure consistent ordering
+                            .sort({ _id: 1 })
                             .skip(startIndex)
                             .limit(CHUNK_SIZE);
 
@@ -976,7 +1042,7 @@ async function initializeQueues() {
                             let successCount = 0;
                             let failureCount = 0;
 
-                            // Track successful deliveries for the tracking collection
+                            // Track successful deliveries
                             const deliveryEvents = [];
 
                             // Process each contact in batch
@@ -987,41 +1053,43 @@ async function initializeQueues() {
                                 try {
                                     // Add tracking to HTML content
                                     const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
+
                                     // Extract plain text for text-only clients
                                     const textContent = extractTextFromHtml(processedHtml);
 
+                                    // Generate List-Unsubscribe headers for RFC 8058 compliance
+                                    const unsubscribeHeaders = generateListUnsubscribeHeaders(contact._id.toString(), brandId.toString(), campaignId.toString(), config.baseUrl);
+
+                                    // Build recipient address
+                                    const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
+
+                                    // Build raw email with List-Unsubscribe headers
+                                    const rawEmailContent = buildRawEmail({
+                                        from: `${fromName} <${fromEmail}>`,
+                                        to: toAddress,
+                                        replyTo: replyTo || fromEmail,
+                                        subject: subject || campaign.subject,
+                                        htmlContent: processedHtml,
+                                        textContent: textContent || 'Empty campaign content',
+                                        listUnsubscribe: unsubscribeHeaders.listUnsubscribe,
+                                        listUnsubscribePost: unsubscribeHeaders.listUnsubscribePost,
+                                        configurationSet: brand.sesConfigurationSet,
+                                        tags: [
+                                            { Name: 'campaignId', Value: campaignId.toString() },
+                                            { Name: 'contactId', Value: contact._id.toString() },
+                                        ],
+                                    });
+
+                                    // Send raw email
                                     const result = await sesClient.send(
-                                        new SendEmailCommand({
-                                            Source: `${fromName} <${fromEmail}>`,
-                                            Destination: {
-                                                ToAddresses: [contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email],
+                                        new SendRawEmailCommand({
+                                            RawMessage: {
+                                                Data: Buffer.from(rawEmailContent),
                                             },
-                                            Message: {
-                                                Subject: {
-                                                    Data: subject || campaign.subject,
-                                                },
-                                                Body: {
-                                                    Html: {
-                                                        Data: processedHtml,
-                                                    },
-                                                    Text: {
-                                                        Data: textContent || 'Empty campaign content',
-                                                    },
-                                                },
-                                            },
-                                            ReplyToAddresses: [replyTo || fromEmail],
-                                            // Configure feedback notifications
                                             ConfigurationSetName: brand.sesConfigurationSet,
-                                            // Tags for tracking
                                             Tags: [
-                                                {
-                                                    Name: 'campaignId',
-                                                    Value: campaignId.toString(),
-                                                },
-                                                {
-                                                    Name: 'contactId',
-                                                    Value: contact._id.toString(),
-                                                },
+                                                { Name: 'campaignId', Value: campaignId.toString() },
+                                                { Name: 'contactId', Value: contact._id.toString() },
                                             ],
                                         })
                                     );
@@ -1034,6 +1102,7 @@ async function initializeQueues() {
                                         eventType: 'delivery',
                                         metadata: {
                                             messageId: result.MessageId,
+                                            hasOneClickUnsubscribe: true,
                                         },
                                     });
 
@@ -1118,7 +1187,7 @@ async function initializeQueues() {
                         if (campaign) {
                             campaign.status = 'failed';
                             campaign.processingMetadata = campaign.processingMetadata || {};
-                            campaign.processingMetadata.hasMoreToProcess = true; // Mark that it can be resumed
+                            campaign.processingMetadata.hasMoreToProcess = true;
                             await campaign.save();
                         }
                     }
@@ -1171,7 +1240,7 @@ async function initializeQueues() {
     // Run cleanup once a day
     setInterval(cleanupOldJobs, 24 * 60 * 60 * 1000);
 
-    console.log('Email campaign worker with tracking started and ready to process jobs');
+    console.log('Email campaign worker with RFC 8058 one-click unsubscribe started and ready to process jobs');
 }
 
 // Start the worker

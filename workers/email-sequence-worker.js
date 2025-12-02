@@ -5,8 +5,9 @@ const Bull = require('bull');
 const Redis = require('ioredis');
 const crypto = require('crypto');
 const cheerio = require('cheerio');
-const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
+const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses');
 const config = require('../src/lib/configCommonJS');
+const { generateUnsubscribeToken } = require('../src/lib/tokenUtils');
 
 // Get Redis URL
 function getRedisUrl() {
@@ -386,11 +387,7 @@ function processHtml(html, sequenceId, enrollmentId, email, trackingDomain, bran
     const trackingPixel = `<img src="${domain}/api/tracking/sequence-open?${trackingParams}" width="1" height="1" alt="" style="display:none;" />`;
     $('body').append(trackingPixel);
 
-    // Add unsubscribe link
-    const config = require('../src/lib/configCommonJS');
-    const { generateUnsubscribeToken } = require('../src/lib/tokenUtils');
-
-    // For sequences, we'll use the enrollmentId as the contact reference
+    // Add unsubscribe link in footer
     const unsubscribeToken = generateUnsubscribeToken(enrollmentId, brandId, sequenceId);
     const unsubscribeUrl = `${config.baseUrl}/unsubscribe/${unsubscribeToken}`;
 
@@ -405,7 +402,81 @@ function processHtml(html, sequenceId, enrollmentId, email, trackingDomain, bran
     return $.html();
 }
 
-// Process sequence email job
+// ===== RFC 8058 ONE-CLICK UNSUBSCRIBE HELPERS =====
+
+// Generate List-Unsubscribe headers for RFC 8058 compliance
+function generateListUnsubscribeHeaders(enrollmentId, brandId, sequenceId, baseUrl) {
+    const token = generateUnsubscribeToken(enrollmentId, brandId, sequenceId);
+    const oneClickUrl = `${baseUrl}/api/unsubscribe/one-click?token=${encodeURIComponent(token)}`;
+
+    return {
+        listUnsubscribe: `<${oneClickUrl}>`,
+        listUnsubscribePost: 'List-Unsubscribe=One-Click',
+    };
+}
+
+// Encode content for quoted-printable (handles special characters properly)
+function encodeQuotedPrintable(str) {
+    if (!str) return '';
+
+    return str
+        .replace(/[^\x20-\x7E\r\n\t]/g, (char) => {
+            const hex = char.charCodeAt(0).toString(16).toUpperCase();
+            return '=' + (hex.length < 2 ? '0' : '') + hex;
+        })
+        .replace(/([^\r\n]{73})/g, '$1=\r\n'); // Soft line breaks at 76 chars
+}
+
+// Build raw MIME email with custom headers including List-Unsubscribe
+function buildRawEmail({ from, to, replyTo, subject, htmlContent, textContent, listUnsubscribe, listUnsubscribePost, configurationSet, tags }) {
+    const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
+    // Build headers
+    let rawEmail = '';
+    rawEmail += `From: ${from}\r\n`;
+    rawEmail += `To: ${to}\r\n`;
+    rawEmail += `Reply-To: ${replyTo}\r\n`;
+    rawEmail += `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=\r\n`;
+    rawEmail += `MIME-Version: 1.0\r\n`;
+    rawEmail += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
+
+    // Add List-Unsubscribe headers for RFC 8058 compliance (Google/Yahoo requirement)
+    rawEmail += `List-Unsubscribe: ${listUnsubscribe}\r\n`;
+    rawEmail += `List-Unsubscribe-Post: ${listUnsubscribePost}\r\n`;
+
+    // Add custom headers for SES tracking
+    if (tags && tags.length > 0) {
+        const tagString = tags.map((t) => `${t.Name}=${t.Value}`).join(', ');
+        rawEmail += `X-SES-MESSAGE-TAGS: ${tagString}\r\n`;
+    }
+
+    if (configurationSet) {
+        rawEmail += `X-SES-CONFIGURATION-SET: ${configurationSet}\r\n`;
+    }
+
+    rawEmail += `\r\n`;
+
+    // Text part
+    rawEmail += `--${boundary}\r\n`;
+    rawEmail += `Content-Type: text/plain; charset=UTF-8\r\n`;
+    rawEmail += `Content-Transfer-Encoding: 7bit\r\n`;
+    rawEmail += `\r\n`;
+    rawEmail += `${textContent}\r\n`;
+
+    // HTML part
+    rawEmail += `--${boundary}\r\n`;
+    rawEmail += `Content-Type: text/html; charset=UTF-8\r\n`;
+    rawEmail += `Content-Transfer-Encoding: 7bit\r\n`;
+    rawEmail += `\r\n`;
+    rawEmail += `${htmlContent}\r\n`;
+
+    // End boundary
+    rawEmail += `--${boundary}--\r\n`;
+
+    return rawEmail;
+}
+
+// ===== PROCESS SEQUENCE EMAIL FUNCTION =====
 async function processSequenceEmail(job) {
     const { enrollmentId, emailOrder } = job.data;
 
@@ -437,8 +508,8 @@ async function processSequenceEmail(job) {
         }
 
         // Get email from sequence
-        const email = sequence.emails.find((e) => e.order === emailOrder);
-        if (!email) {
+        const emailStep = sequence.emails.find((e) => e.order === emailOrder);
+        if (!emailStep) {
             throw new Error(`Email step ${emailOrder} not found in sequence`);
         }
 
@@ -485,32 +556,48 @@ async function processSequenceEmail(job) {
 
         // Process HTML with tracking
         const trackingDomain = config.trackingDomain;
-        const processedHtml = processHtml(email.content, sequence._id.toString(), enrollment._id.toString(), contact.email, trackingDomain, brand._id.toString());
+        const processedHtml = processHtml(emailStep.content, sequence._id.toString(), enrollment._id.toString(), contact.email, trackingDomain, brand._id.toString());
 
         const textContent = extractTextFromHtml(processedHtml);
 
-        // Send email
+        // Generate List-Unsubscribe headers for RFC 8058 compliance
+        const unsubscribeHeaders = generateListUnsubscribeHeaders(enrollment._id.toString(), brand._id.toString(), sequence._id.toString(), config.baseUrl);
+
+        // Build recipient address
+        const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
+
+        // Build the raw email with List-Unsubscribe headers
+        const rawEmailContent = buildRawEmail({
+            from: `${brand.fromName} <${brand.fromEmail}>`,
+            to: toAddress,
+            replyTo: brand.replyToEmail || brand.fromEmail,
+            subject: emailStep.subject,
+            htmlContent: processedHtml,
+            textContent: textContent || 'Email content',
+            listUnsubscribe: unsubscribeHeaders.listUnsubscribe,
+            listUnsubscribePost: unsubscribeHeaders.listUnsubscribePost,
+            configurationSet: brand.sesConfigurationSet,
+            tags: [
+                { Name: 'sequenceId', Value: sequence._id.toString() },
+                { Name: 'enrollmentId', Value: enrollment._id.toString() },
+                { Name: 'emailOrder', Value: emailOrder.toString() },
+                { Name: 'type', Value: 'sequence' },
+            ],
+        });
+
+        // Send raw email using SendRawEmailCommand
         const result = await sesClient.send(
-            new SendEmailCommand({
-                Source: `${brand.fromName} <${brand.fromEmail}>`,
-                Destination: {
-                    ToAddresses: [contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email],
+            new SendRawEmailCommand({
+                RawMessage: {
+                    Data: Buffer.from(rawEmailContent),
                 },
-                Message: {
-                    Subject: { Data: email.subject },
-                    Body: {
-                        Html: { Data: processedHtml },
-                        Text: { Data: textContent || 'Email content' },
-                    },
-                },
-                ReplyToAddresses: [brand.replyToEmail || brand.fromEmail],
+                ConfigurationSetName: brand.sesConfigurationSet || undefined,
                 Tags: [
                     { Name: 'sequenceId', Value: sequence._id.toString() },
                     { Name: 'enrollmentId', Value: enrollment._id.toString() },
                     { Name: 'emailOrder', Value: emailOrder.toString() },
                     { Name: 'type', Value: 'sequence' },
                 ],
-                ConfigurationSetName: brand.sesConfigurationSet || undefined,
             })
         );
 
@@ -526,10 +613,12 @@ async function processSequenceEmail(job) {
                 userId: sequence.userId,
                 email: contact.email,
                 emailOrder: emailOrder,
-                subject: email.subject,
+                subject: emailStep.subject,
                 status: 'sent',
                 messageId: result.MessageId,
-                metadata: {},
+                metadata: {
+                    hasOneClickUnsubscribe: true,
+                },
                 sentAt: new Date(),
             });
             console.log(`Logged sequence email send for ${contact.email}`);
@@ -764,7 +853,7 @@ async function startWorker() {
             console.error(`Job ${job.id} failed:`, error);
         });
 
-        console.log('Email sequence worker started');
+        console.log('Email sequence worker started with RFC 8058 one-click unsubscribe support');
     } catch (error) {
         console.error('Failed to start sequence worker:', error);
         process.exit(1);
