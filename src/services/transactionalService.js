@@ -100,13 +100,53 @@ export async function getTemplateStats(templateId) {
         throw new Error('Template not found');
     }
 
-    // Get additional stats from logs if needed
-    const sentCount = await TransactionalLog.countDocuments({ templateId });
-    const logs = await TransactionalLog.find({ templateId }).sort({ createdAt: -1 }).limit(10).lean();
+    const templateObjectId = new mongoose.Types.ObjectId(templateId);
+
+    // Get sent count from logs
+    const sent = await TransactionalLog.countDocuments({ templateId: templateObjectId });
+
+    // Count unique opens from events in logs
+    const opensCount = await TransactionalLog.countDocuments({
+        templateId: templateObjectId,
+        'events.type': 'open',
+    });
+
+    // Count unique clicks from events in logs
+    const clicksCount = await TransactionalLog.countDocuments({
+        templateId: templateObjectId,
+        'events.type': 'click',
+    });
+
+    // Count bounces from events in logs
+    const bouncesCount = await TransactionalLog.countDocuments({
+        templateId: templateObjectId,
+        'events.type': 'bounce',
+    });
+
+    // Count complaints from events in logs
+    const complaintsCount = await TransactionalLog.countDocuments({
+        templateId: templateObjectId,
+        'events.type': 'complaint',
+    });
+
+    const logs = await TransactionalLog.find({ templateId: templateObjectId }).sort({ createdAt: -1 }).limit(10).lean();
+
+    // Calculate rates
+    const openRate = sent > 0 ? ((opensCount / sent) * 100).toFixed(1) : '0';
+    const clickRate = sent > 0 ? ((clicksCount / sent) * 100).toFixed(1) : '0';
+    const bounceRate = sent > 0 ? ((bouncesCount / sent) * 100).toFixed(1) : '0';
+    const complaintRate = sent > 0 ? ((complaintsCount / sent) * 100).toFixed(1) : '0';
 
     return {
-        ...template.stats,
-        sentCount,
+        sent,
+        opens: opensCount,
+        clicks: clicksCount,
+        bounces: bouncesCount,
+        complaints: complaintsCount,
+        openRate,
+        clickRate,
+        bounceRate,
+        complaintRate,
         recentLogs: logs,
     };
 }
