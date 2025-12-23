@@ -1126,12 +1126,13 @@ async function initializeQueues() {
                             }
 
                             // Update campaign stats for this batch
+                            // Note: stats.recipients is already set when campaign starts sending,
+                            // so we only increment processed and bounces here to avoid double counting
                             await Campaign.updateOne(
                                 { _id: campaignId },
                                 {
                                     $inc: {
                                         'stats.processed': batchContacts.length,
-                                        'stats.recipients': successCount,
                                         'stats.bounces': failureCount,
                                         'processingMetadata.processedBatches': 1,
                                     },
