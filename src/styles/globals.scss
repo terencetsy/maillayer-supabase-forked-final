@@ -91,6 +91,8 @@ select {
     box-shadow: 0 0 0 1px oklch(0.145 0 0 / 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     padding: 20px;
     border-radius: 1rem;
+    overflow: hidden;
+    min-width: 0;
 
     .top-header {
         .page-title {
@@ -276,6 +278,53 @@ select {
         }
     }
 }
+
+// Contact details table (individual contact list view with checkbox)
+.contacts-details-table-wrapper {
+    .campaigns-table {
+        thead tr th:nth-child(1),
+        tbody tr td:nth-child(1) {
+            width: 40px;
+            min-width: 40px;
+            max-width: 40px;
+        }
+        thead tr th:nth-child(2),
+        tbody tr td:nth-child(2) {
+            width: 22%;
+        } // Email
+        thead tr th:nth-child(3),
+        tbody tr td:nth-child(3) {
+            width: 12%;
+        } // First Name
+        thead tr th:nth-child(4),
+        tbody tr td:nth-child(4) {
+            width: 12%;
+        } // Last Name
+        thead tr th:nth-child(5),
+        tbody tr td:nth-child(5) {
+            width: 10%;
+        } // Status
+        thead tr th:nth-child(6),
+        tbody tr td:nth-child(6) {
+            width: 12%;
+        } // Phone
+        thead tr th:nth-child(7),
+        tbody tr td:nth-child(7) {
+            width: 10%;
+        } // Added
+        thead tr th:nth-child(8),
+        tbody tr td:nth-child(8) {
+            width: 100px;
+        } // Actions
+
+        tbody tr td {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+}
+
 .button {
     padding: 0.6rem 1rem;
     border-radius: 12.8px;

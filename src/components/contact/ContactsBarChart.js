@@ -213,23 +213,22 @@ export default function ContactsBarChart({ data = [], title = 'Daily Activity', 
                             </div>
 
                             {/* Label */}
-                            {shouldShowLabel(index) && (
-                                <div
-                                    style={{
-                                        fontSize: '10px',
-                                        color: '#999',
-                                        fontWeight: '500',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        maxWidth: '100%',
-                                        textAlign: 'center',
-                                    }}
-                                    title={formatLabel(item.date, item)}
-                                >
-                                    {formatLabel(item.date, item)}
-                                </div>
-                            )}
+                            <div
+                                style={{
+                                    fontSize: '10px',
+                                    color: '#999',
+                                    fontWeight: '500',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%',
+                                    textAlign: 'center',
+                                    visibility: shouldShowLabel(index) ? 'visible' : 'hidden',
+                                }}
+                                title={formatLabel(item.date, item)}
+                            >
+                                {formatLabel(item.date, item)}
+                            </div>
                         </div>
                     );
                 })}

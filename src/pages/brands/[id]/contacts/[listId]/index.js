@@ -821,10 +821,11 @@ export default function ContactListDetails() {
                                     </div>
                                 ) : (
                                     <>
-                                        <table className="campaigns-table">
-                                            <thead>
+                                        <div className="contacts-details-table-wrapper">
+                                            <table className="campaigns-table">
+                                                <thead>
                                                 <tr>
-                                                    <th style={{ width: '40px' }}>
+                                                    <th>
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedContacts.length === contacts.length && contacts.length > 0}
@@ -933,8 +934,10 @@ export default function ContactListDetails() {
                                             </tbody>
                                         </table>
 
-                                        {/* Pagination */}
-                                        {totalPages > 1 && (
+                                    </div>
+
+                                    {/* Pagination */}
+                                    {totalPages > 1 && (
                                             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1.5rem', padding: '1rem' }}>
                                                 <button
                                                     className="button button--secondary button--small"
