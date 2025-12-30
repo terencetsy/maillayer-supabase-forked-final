@@ -10,6 +10,7 @@ export default function BrandLayout({ children, brand }) {
     const { data: session, status } = useSession();
     const [isLoading, setIsLoading] = useState(true);
     const [quota, setQuota] = useState(null);
+    const [quotaProvider, setQuotaProvider] = useState(null);
     const [loadingQuota, setLoadingQuota] = useState(true);
 
     useEffect(() => {
@@ -47,12 +48,15 @@ export default function BrandLayout({ children, brand }) {
 
             if (response.ok && data.configured) {
                 setQuota(data.quota);
+                setQuotaProvider(data.providerName || 'Email Provider');
             } else {
                 setQuota(null);
+                setQuotaProvider(data.providerName || null);
             }
         } catch (error) {
             console.error('Error fetching quota:', error);
             setQuota(null);
+            setQuotaProvider(null);
         } finally {
             setLoadingQuota(false);
         }
@@ -209,7 +213,7 @@ export default function BrandLayout({ children, brand }) {
                         ) : quota ? (
                             <div className={`quota-container ${getQuotaClass(quota.percentageUsed)}`}>
                                 <div className="quota-header">
-                                    <span className="quota-label">24-Hour Email Quota</span>
+                                    <span className="quota-label">{quotaProvider || 'Email'} Quota</span>
                                     <span className="quota-percentage">{quota.percentageUsed.toFixed(1)}%</span>
                                 </div>
                                 <div className="quota-bar-container">
@@ -221,8 +225,8 @@ export default function BrandLayout({ children, brand }) {
                                     />
                                 </div>
                                 <div className="quota-details">
-                                    <span className="quota-sent">{formatNumber(quota.sentLast24Hours)} sent</span>
-                                    <span className="quota-total">of {formatNumber(quota.max24HourSend)}</span>
+                                    <span className="quota-sent">{formatNumber(quota.sentLast24Hours)} sent{quota.isMonthlyQuota ? ' this month' : ''}</span>
+                                    <span className="quota-total">of {formatNumber(quota.max24HourSend)}{quota.isMonthlyQuota ? '/mo' : ''}</span>
                                 </div>
                                 <div className="quota-remaining">{formatNumber(quota.remainingQuota)} emails remaining</div>
                             </div>
@@ -231,7 +235,7 @@ export default function BrandLayout({ children, brand }) {
                                 href={`/brands/${brand._id}/verification`}
                                 className="nav-item secondary"
                             >
-                                <span>Configure AWS to view quota</span>
+                                <span>Configure {quotaProvider || 'email provider'} to view quota</span>
                             </Link>
                         )}
                     </div>

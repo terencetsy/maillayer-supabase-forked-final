@@ -706,7 +706,7 @@ export default async function handler(req, res) {
                                     <td style={{ padding: '0.5rem 0' }}>
                                         <span style={{ color: '#dc2626', fontWeight: '500' }}>Yes</span>
                                     </td>
-                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact's email address</td>
+                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact&apos;s email address</td>
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                                     <td style={{ padding: '0.5rem 0' }}>
@@ -714,7 +714,7 @@ export default async function handler(req, res) {
                                     </td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>string</td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>No</td>
-                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact's first name</td>
+                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact&apos;s first name</td>
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                                     <td style={{ padding: '0.5rem 0' }}>
@@ -722,7 +722,7 @@ export default async function handler(req, res) {
                                     </td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>string</td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>No</td>
-                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact's last name</td>
+                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact&apos;s last name</td>
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                                     <td style={{ padding: '0.5rem 0' }}>
@@ -730,7 +730,7 @@ export default async function handler(req, res) {
                                     </td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>string</td>
                                     <td style={{ padding: '0.5rem 0', color: '#666' }}>No</td>
-                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact's phone number</td>
+                                    <td style={{ padding: '0.5rem 0', color: '#666' }}>Contact&apos;s phone number</td>
                                 </tr>
                                 <tr>
                                     <td style={{ padding: '0.5rem 0' }}>
@@ -871,7 +871,7 @@ export default async function handler(req, res) {
 
                             {showAdvanced && (
                                 <div style={{ marginTop: '0.75rem' }}>
-                                    <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8125rem', color: '#666' }}>You can also pass custom fields directly in the body - they'll automatically be stored in customFields:</p>
+                                    <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.8125rem', color: '#666' }}>You can also pass custom fields directly in the body - they&apos;ll automatically be stored in customFields:</p>
                                     <div style={{ position: 'relative' }}>
                                         <button
                                             onClick={() => copyToClipboard(codeExamples.javascriptShort, 'shorthand')}

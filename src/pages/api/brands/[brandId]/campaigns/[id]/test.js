@@ -4,40 +4,12 @@ import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
 import { getCampaignById } from '@/services/campaignService';
 import { getBrandById } from '@/services/brandService';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import crypto from 'crypto';
 
-// Utility function to decrypt AWS secret key
-function decryptData(encryptedText, secretKey) {
-    try {
-        if (!encryptedText) return null;
-
-        // If it's not encrypted or contains ":", just return it as is
-        if (!encryptedText.includes(':')) {
-            return encryptedText;
-        }
-
-        const key = crypto.scryptSync(secretKey || process.env.ENCRYPTION_KEY || 'default-fallback-key', 'salt', 32);
-
-        // Split the IV and encrypted content
-        const parts = encryptedText.split(':');
-        if (parts.length !== 2) {
-            return encryptedText;
-        }
-
-        const iv = Buffer.from(parts[0], 'hex');
-        const encrypted = Buffer.from(parts[1], 'hex');
-
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-
-        return decrypted;
-    } catch (error) {
-        console.error('Decryption error:', error);
-        return encryptedText;
-    }
-}
+// Dynamic import for provider factory (CommonJS module)
+const getProviderFactory = async () => {
+    const ProviderFactory = require('@/lib/email-providers/ProviderFactory');
+    return ProviderFactory;
+};
 
 // Extract plain text from HTML
 function extractTextFromHtml(html) {
@@ -98,13 +70,21 @@ export default async function handler(req, res) {
             return res.status(403).json({ message: 'Not authorized to access this brand' });
         }
 
-        // Check if brand has SES credentials configured
+        // Check if brand has email provider credentials configured
         if (brand.status === 'pending_setup' || brand.status === 'pending_verification') {
             return res.status(400).json({ message: 'Brand email sending is not configured or verified' });
         }
 
-        if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
+        const provider = brand.emailProvider || 'ses';
+        const ProviderFactory = await getProviderFactory();
+
+        // Check provider-specific credentials
+        if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
             return res.status(400).json({ message: 'AWS SES credentials not configured for this brand' });
+        } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+            return res.status(400).json({ message: 'SendGrid API key not configured for this brand' });
+        } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+            return res.status(400).json({ message: 'Mailgun credentials not configured for this brand' });
         }
 
         // Get campaign
@@ -123,14 +103,8 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Campaign has no content to send' });
         }
 
-        // Create SES client
-        const sesClient = new SESClient({
-            region: brand.awsRegion || 'us-east-1',
-            credentials: {
-                accessKeyId: brand.awsAccessKey,
-                secretAccessKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
-            },
-        });
+        // Create email provider using factory
+        const emailProvider = ProviderFactory.createProvider(brand);
 
         // Prepare email content (without tracking for test emails)
         const htmlContent = campaign.content;
@@ -146,43 +120,34 @@ export default async function handler(req, res) {
 
         const finalHtmlContent = htmlContent.includes('<body') ? htmlContent.replace(/<body[^>]*>/i, `$&${testBanner}`) : `${testBanner}${htmlContent}`;
 
-        // Send test email
-        const sendCommand = new SendEmailCommand({
-            Source: `${fromName || brand.fromName || brand.name} <${fromEmail || brand.fromEmail}>`,
-            Destination: {
-                ToAddresses: [email],
-            },
-            Message: {
-                Subject: {
-                    Data: `[TEST] ${campaign.subject}`,
-                },
-                Body: {
-                    Html: {
-                        Data: finalHtmlContent,
-                    },
-                    Text: {
-                        Data: `TEST EMAIL\n\n${textContent}`,
-                    },
-                },
-            },
-            ReplyToAddresses: [replyTo || brand.replyToEmail || fromEmail || brand.fromEmail],
+        // Send test email using provider abstraction
+        const result = await emailProvider.send({
+            from: `${fromName || brand.fromName || brand.name} <${fromEmail || brand.fromEmail}>`,
+            to: email,
+            subject: `[TEST] ${campaign.subject}`,
+            html: finalHtmlContent,
+            text: `TEST EMAIL\n\n${textContent}`,
+            replyTo: replyTo || brand.replyToEmail || fromEmail || brand.fromEmail,
+            tags: [
+                { name: 'campaignId', value: id },
+                { name: 'type', value: 'test' },
+            ],
         });
 
-        const result = await sesClient.send(sendCommand);
-
-        console.log(`Test email sent for campaign ${id} to ${email}, MessageId: ${result.MessageId}`);
+        console.log(`Test email sent for campaign ${id} to ${email} via ${emailProvider.getName()}, MessageId: ${result.messageId}`);
 
         return res.status(200).json({
             message: 'Test email sent successfully',
-            messageId: result.MessageId,
+            messageId: result.messageId,
             email: email,
+            provider: emailProvider.getName(),
         });
     } catch (error) {
         console.error('Error sending test email:', error);
 
-        // Handle specific AWS SES errors
+        // Handle specific provider errors
         if (error.name === 'MessageRejected') {
-            return res.status(400).json({ message: 'Email was rejected by SES. Please check your sending domain verification.' });
+            return res.status(400).json({ message: 'Email was rejected. Please check your sending domain verification.' });
         }
 
         if (error.name === 'InvalidParameterValue') {
@@ -190,7 +155,7 @@ export default async function handler(req, res) {
         }
 
         if (error.name === 'MailFromDomainNotVerifiedException') {
-            return res.status(400).json({ message: 'Your sending domain is not verified in AWS SES.' });
+            return res.status(400).json({ message: 'Your sending domain is not verified.' });
         }
 
         return res.status(500).json({

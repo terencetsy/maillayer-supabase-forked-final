@@ -3,11 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/pages/api/auth/[...nextauth]';
 import connectToDatabase from '@/lib/mongodb';
 import { getBrandById } from '@/services/brandService';
-import AWS from 'aws-sdk';
 
 // In-memory cache
 const quotaCache = new Map();
-const CACHE_DURATION = 10 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+// Dynamic import for provider factory (CommonJS module)
+const getProviderFactory = async () => {
+    const ProviderFactory = require('@/lib/email-providers/ProviderFactory');
+    return ProviderFactory;
+};
 
 export default async function handler(req, res) {
     try {
@@ -29,11 +34,12 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Missing brand ID' });
         }
 
-        // Check cache first
+        // Check cache first (skip if refresh=true query param)
         const cacheKey = `quota_${brandId}`;
         const cached = quotaCache.get(cacheKey);
+        const forceRefresh = req.query.refresh === 'true';
 
-        if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
             console.log('Returning cached quota data');
             // Set cache headers
             res.setHeader('Cache-Control', `public, s-maxage=${CACHE_DURATION / 1000}, stale-while-revalidate`);
@@ -50,39 +56,52 @@ export default async function handler(req, res) {
             return res.status(403).json({ message: 'Not authorized to access this brand' });
         }
 
-        // Check if AWS credentials are configured
-        if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
-            const notConfiguredResponse = {
+        const provider = brand.emailProvider || 'ses';
+        const ProviderFactory = await getProviderFactory();
+
+        // Check if provider credentials are configured
+        if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
+            return res.status(200).json({
                 configured: false,
-                message: 'AWS credentials not configured',
-            };
-            return res.status(200).json(notConfiguredResponse);
+                provider: 'ses',
+                providerName: 'Amazon SES',
+                message: 'AWS SES credentials not configured',
+            });
+        } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+            return res.status(200).json({
+                configured: false,
+                provider: 'sendgrid',
+                providerName: 'SendGrid',
+                message: 'SendGrid API key not configured',
+            });
+        } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+            return res.status(200).json({
+                configured: false,
+                provider: 'mailgun',
+                providerName: 'Mailgun',
+                message: 'Mailgun credentials not configured',
+            });
         }
 
-        // Initialize AWS SES client
-        const ses = new AWS.SES({
-            region: brand.awsRegion,
-            accessKeyId: brand.awsAccessKey,
-            secretAccessKey: brand.awsSecretKey,
-        });
-
         try {
-            // Get send quota
-            const quotaData = await ses.getSendQuota().promise();
+            // Create provider instance
+            const emailProvider = ProviderFactory.createProvider(brand);
 
-            // Get send statistics for the last 24 hours
-            const stats = await ses.getSendStatistics().promise();
+            // Get quota from provider
+            const quotaData = await emailProvider.getQuota();
 
             const responseData = {
                 configured: true,
+                provider,
+                providerName: ProviderFactory.getProviderDisplayName(provider),
                 quota: {
-                    max24HourSend: quotaData.Max24HourSend,
-                    maxSendRate: quotaData.MaxSendRate,
-                    sentLast24Hours: quotaData.SentLast24Hours,
-                    remainingQuota: quotaData.Max24HourSend - quotaData.SentLast24Hours,
-                    percentageUsed: (quotaData.SentLast24Hours / quotaData.Max24HourSend) * 100,
+                    max24HourSend: quotaData.max24HourSend,
+                    maxSendRate: quotaData.maxSendRate,
+                    sentLast24Hours: quotaData.sentLast24Hours,
+                    remainingQuota: quotaData.max24HourSend - quotaData.sentLast24Hours,
+                    percentageUsed: quotaData.max24HourSend > 0 ? (quotaData.sentLast24Hours / quotaData.max24HourSend) * 100 : 0,
+                    isMonthlyQuota: quotaData.isMonthlyQuota || false,
                 },
-                statistics: stats.SendDataPoints,
             };
 
             // Store in cache
@@ -96,15 +115,15 @@ export default async function handler(req, res) {
             res.setHeader('X-Cache', 'MISS');
 
             return res.status(200).json(responseData);
-        } catch (awsError) {
-            console.error('AWS SES error:', awsError);
+        } catch (providerError) {
+            console.error(`${provider} quota error:`, providerError);
             return res.status(500).json({
-                message: 'Error fetching quota from AWS',
-                error: awsError.message,
+                message: `Error fetching quota from ${ProviderFactory.getProviderDisplayName(provider)}`,
+                error: providerError.message,
             });
         }
     } catch (error) {
-        console.error('Error fetching SES quota:', error);
+        console.error('Error fetching quota:', error);
         return res.status(500).json({
             message: 'Error fetching quota information',
             error: error.message,

@@ -952,7 +952,7 @@ export default function ImportContactsModal({ brandId, listId, method = 'manual'
                                                     </div>
 
                                                     {customFieldMappings.length === 0 ? (
-                                                        <p style={{ fontSize: '0.8125rem', color: '#999', margin: 0, fontStyle: 'italic' }}>No additional columns found. Click "Add" to map custom fields.</p>
+                                                        <p style={{ fontSize: '0.8125rem', color: '#999', margin: 0, fontStyle: 'italic' }}>No additional columns found. Click &quot;Add&quot; to map custom fields.</p>
                                                     ) : (
                                                         <>
                                                             {/* Select All / Deselect All */}

@@ -5,9 +5,9 @@ const Bull = require('bull');
 const Redis = require('ioredis');
 const crypto = require('crypto');
 const cheerio = require('cheerio');
-const { SESClient, SendRawEmailCommand } = require('@aws-sdk/client-ses');
 const config = require('../src/lib/configCommonJS');
 const { generateUnsubscribeToken } = require('../src/lib/tokenUtils');
+const ProviderFactory = require('../src/lib/email-providers/ProviderFactory');
 
 // Get Redis URL
 function getRedisUrl() {
@@ -143,6 +143,27 @@ const BrandSchema = new mongoose.Schema(
         replyToEmail: String,
         status: String,
         sesConfigurationSet: String,
+        // Email Provider Configuration
+        emailProvider: {
+            type: String,
+            enum: ['ses', 'sendgrid', 'mailgun'],
+            default: 'ses',
+        },
+        emailProviderConnectionType: {
+            type: String,
+            enum: ['api', 'smtp'],
+            default: 'api',
+        },
+        // SendGrid Configuration
+        sendgridApiKey: String,
+        // Mailgun Configuration
+        mailgunApiKey: String,
+        mailgunDomain: String,
+        mailgunRegion: {
+            type: String,
+            enum: ['us', 'eu'],
+            default: 'us',
+        },
     },
     { timestamps: true, collection: 'brands' }
 );
@@ -545,14 +566,25 @@ async function processSequenceEmail(job) {
             throw new Error(`Brand not found: ${enrollment.brandId}`);
         }
 
-        // Create SES client
-        const sesClient = new SESClient({
-            region: brand.awsRegion || 'us-east-1',
-            credentials: {
-                accessKeyId: brand.awsAccessKey,
-                secretAccessKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
-            },
-        });
+        // Check if brand has email provider credentials configured
+        const provider = brand.emailProvider || 'ses';
+        if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
+            throw new Error('AWS SES credentials not configured for this brand');
+        } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+            throw new Error('SendGrid API key not configured for this brand');
+        } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+            throw new Error('Mailgun credentials not configured for this brand');
+        }
+
+        // Create email provider using factory
+        const brandWithDecryptedSecrets = {
+            ...brand.toObject ? brand.toObject() : brand,
+            awsSecretKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
+            sendgridApiKey: decryptData(brand.sendgridApiKey, process.env.ENCRYPTION_KEY),
+            mailgunApiKey: decryptData(brand.mailgunApiKey, process.env.ENCRYPTION_KEY),
+        };
+        const emailProvider = ProviderFactory.createProvider(brandWithDecryptedSecrets, { decryptSecrets: false });
+        console.log(`Using email provider: ${emailProvider.getName()}`);
 
         // Process HTML with tracking
         const trackingDomain = config.trackingDomain;
@@ -566,8 +598,8 @@ async function processSequenceEmail(job) {
         // Build recipient address
         const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
 
-        // Build the raw email with List-Unsubscribe headers
-        const rawEmailContent = buildRawEmail({
+        // Send email using provider abstraction
+        const result = await emailProvider.sendRaw({
             from: `${brand.fromName} <${brand.fromEmail}>`,
             to: toAddress,
             replyTo: brand.replyToEmail || brand.fromEmail,
@@ -585,23 +617,7 @@ async function processSequenceEmail(job) {
             ],
         });
 
-        // Send raw email using SendRawEmailCommand
-        const result = await sesClient.send(
-            new SendRawEmailCommand({
-                RawMessage: {
-                    Data: Buffer.from(rawEmailContent),
-                },
-                ConfigurationSetName: brand.sesConfigurationSet || undefined,
-                Tags: [
-                    { Name: 'sequenceId', Value: sequence._id.toString() },
-                    { Name: 'enrollmentId', Value: enrollment._id.toString() },
-                    { Name: 'emailOrder', Value: emailOrder.toString() },
-                    { Name: 'type', Value: 'sequence' },
-                ],
-            })
-        );
-
-        console.log(`Email sent to ${contact.email}, MessageId: ${result.MessageId}`);
+        console.log(`Email sent to ${contact.email} via ${emailProvider.getName()}, MessageId: ${result.messageId}`);
 
         // ===== LOG THE EMAIL SEND =====
         try {
@@ -615,9 +631,10 @@ async function processSequenceEmail(job) {
                 emailOrder: emailOrder,
                 subject: emailStep.subject,
                 status: 'sent',
-                messageId: result.MessageId,
+                messageId: result.messageId,
                 metadata: {
                     hasOneClickUnsubscribe: true,
+                    provider: emailProvider.getName(),
                 },
                 sentAt: new Date(),
             });
@@ -631,7 +648,7 @@ async function processSequenceEmail(job) {
         enrollment.emailsSent.push({
             emailOrder,
             sentAt: new Date(),
-            messageId: result.MessageId,
+            messageId: result.messageId,
             status: 'sent',
         });
         enrollment.currentStep = emailOrder;
@@ -677,9 +694,10 @@ async function processSequenceEmail(job) {
 
         return {
             success: true,
-            messageId: result.MessageId,
+            messageId: result.messageId,
             email: contact.email,
             step: emailOrder,
+            provider: emailProvider.getName(),
         };
     } catch (error) {
         console.error(`Error processing sequence email:`, error);

@@ -66,6 +66,60 @@ const BrandSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        // Email Provider Configuration
+        emailProvider: {
+            type: String,
+            enum: ['ses', 'sendgrid', 'mailgun'],
+            default: 'ses',
+        },
+        emailProviderConnectionType: {
+            type: String,
+            enum: ['api', 'smtp'],
+            default: 'api',
+        },
+        // SendGrid Configuration
+        sendgridApiKey: {
+            type: String,
+            trim: true,
+            select: false, // Don't return in regular queries
+        },
+        // Mailgun Configuration
+        mailgunApiKey: {
+            type: String,
+            trim: true,
+            select: false, // Don't return in regular queries
+        },
+        mailgunDomain: {
+            type: String,
+            trim: true,
+        },
+        mailgunRegion: {
+            type: String,
+            enum: ['us', 'eu'],
+            default: 'us',
+        },
+        // Generic SMTP Configuration (for SMTP connection type)
+        smtpHost: {
+            type: String,
+            trim: true,
+        },
+        smtpPort: {
+            type: Number,
+            default: 587,
+        },
+        smtpUsername: {
+            type: String,
+            trim: true,
+        },
+        smtpPassword: {
+            type: String,
+            trim: true,
+            select: false, // Don't return in regular queries
+        },
+        smtpSecure: {
+            type: Boolean,
+            default: false,
+        },
         createdAt: {
             type: Date,
             default: Date.now,
@@ -80,10 +134,13 @@ const BrandSchema = new mongoose.Schema(
     }
 );
 
-// Don't return AWS Secret Key when converting document to JSON
+// Don't return sensitive keys when converting document to JSON
 BrandSchema.set('toJSON', {
     transform: function (doc, ret, opt) {
         delete ret.awsSecretKey;
+        delete ret.sendgridApiKey;
+        delete ret.mailgunApiKey;
+        delete ret.smtpPassword;
         return ret;
     },
 });

@@ -11,6 +11,7 @@ const { SESClient, SendRawEmailCommand, GetSendQuotaCommand } = require('@aws-sd
 // Load our CommonJS compatible config
 const config = require('../src/lib/configCommonJS');
 const { generateUnsubscribeToken } = require('../src/lib/tokenUtils');
+const ProviderFactory = require('../src/lib/email-providers/ProviderFactory');
 
 // Define all the models we need directly in this file for worker use
 // This ensures they are available when we process jobs
@@ -66,6 +67,40 @@ function defineModels() {
                 type: String,
                 enum: ['active', 'inactive', 'pending_setup', 'pending_verification'],
                 default: 'pending_setup',
+            },
+            // Email Provider Configuration
+            emailProvider: {
+                type: String,
+                enum: ['ses', 'sendgrid', 'mailgun'],
+                default: 'ses',
+            },
+            emailProviderConnectionType: {
+                type: String,
+                enum: ['api', 'smtp'],
+                default: 'api',
+            },
+            // SendGrid Configuration
+            sendgridApiKey: {
+                type: String,
+                trim: true,
+            },
+            // Mailgun Configuration
+            mailgunApiKey: {
+                type: String,
+                trim: true,
+            },
+            mailgunDomain: {
+                type: String,
+                trim: true,
+            },
+            mailgunRegion: {
+                type: String,
+                enum: ['us', 'eu'],
+                default: 'us',
+            },
+            sesConfigurationSet: {
+                type: String,
+                trim: true,
             },
         },
         {
@@ -680,19 +715,20 @@ async function initializeQueues() {
 
             job.progress(20);
 
-            // Create SES client
-            const sesClient = new SESClient({
-                region: brand.awsRegion || 'us-east-1',
-                credentials: {
-                    accessKeyId: brand.awsAccessKey,
-                    secretAccessKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
-                },
-            });
+            // Create email provider using factory
+            const brandObj = brand.toObject ? brand.toObject() : brand;
+            const brandWithDecryptedSecrets = {
+                ...brandObj,
+                awsSecretKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
+                sendgridApiKey: decryptData(brand.sendgridApiKey, process.env.ENCRYPTION_KEY),
+                mailgunApiKey: decryptData(brand.mailgunApiKey, process.env.ENCRYPTION_KEY),
+            };
+            const emailProvider = ProviderFactory.createProvider(brandWithDecryptedSecrets, { decryptSecrets: false });
+            console.log(`Using email provider: ${emailProvider.getName()} for warmup batch`);
 
-            // Check SES quota
-            const quotaCommand = new GetSendQuotaCommand({});
-            const quotaResponse = await sesClient.send(quotaCommand);
-            const maxSendRate = quotaResponse.MaxSendRate || 10;
+            // Check provider quota
+            const quotaResponse = await emailProvider.getQuota();
+            const maxSendRate = quotaResponse.maxSendRate || 10;
 
             // Process this batch
             console.log(`Sending ${contacts.length} emails for warmup batch ${warmupStage}`);
@@ -725,12 +761,11 @@ async function initializeQueues() {
                     // Build recipient address
                     const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
 
-                    // Build raw email with List-Unsubscribe headers
-                    const rawEmailContent = buildRawEmail({
+                    // Send email using provider abstraction
+                    const result = await emailProvider.sendRaw({
                         from: `${fromName} <${fromEmail}>`,
                         to: toAddress,
                         replyTo: replyTo || fromEmail,
-                        // subject: subject || campaign.subject,
                         subject: campaign.subject || subject || 'No Subject',
                         htmlContent: processedHtml,
                         textContent: textContent || 'Empty campaign content',
@@ -744,21 +779,6 @@ async function initializeQueues() {
                         ],
                     });
 
-                    // Send raw email
-                    const result = await sesClient.send(
-                        new SendRawEmailCommand({
-                            RawMessage: {
-                                Data: Buffer.from(rawEmailContent),
-                            },
-                            ConfigurationSetName: brand.sesConfigurationSet,
-                            Tags: [
-                                { Name: 'campaignId', Value: campaignId.toString() },
-                                { Name: 'contactId', Value: contact._id.toString() },
-                                { Name: 'warmupStage', Value: warmupStage.toString() },
-                            ],
-                        })
-                    );
-
                     // Add delivery event
                     deliveryEvents.push({
                         contactId: contact._id,
@@ -766,9 +786,10 @@ async function initializeQueues() {
                         email: contact.email,
                         eventType: 'delivery',
                         metadata: {
-                            messageId: result.MessageId,
+                            messageId: result.messageId,
                             warmupStage: warmupStage,
                             hasOneClickUnsubscribe: true,
+                            provider: emailProvider.getName(),
                         },
                     });
 
@@ -934,19 +955,26 @@ async function initializeQueues() {
                 throw new Error(`Brand not found: ${brandId}`);
             }
 
-            // Check if brand has SES credentials
-            if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
+            // Check if brand has email provider credentials configured
+            const provider = brand.emailProvider || 'ses';
+            if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
                 throw new Error('AWS SES credentials not configured for this brand');
+            } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+                throw new Error('SendGrid API key not configured for this brand');
+            } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+                throw new Error('Mailgun credentials not configured for this brand');
             }
 
-            // Create SES client using brand credentials directly
-            const sesClient = new SESClient({
-                region: brand.awsRegion || 'us-east-1',
-                credentials: {
-                    accessKeyId: brand.awsAccessKey,
-                    secretAccessKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
-                },
-            });
+            // Create email provider using factory
+            const brandObj = brand.toObject ? brand.toObject() : brand;
+            const brandWithDecryptedSecrets = {
+                ...brandObj,
+                awsSecretKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
+                sendgridApiKey: decryptData(brand.sendgridApiKey, process.env.ENCRYPTION_KEY),
+                mailgunApiKey: decryptData(brand.mailgunApiKey, process.env.ENCRYPTION_KEY),
+            };
+            const emailProvider = ProviderFactory.createProvider(brandWithDecryptedSecrets, { decryptSecrets: false });
+            console.log(`Using email provider: ${emailProvider.getName()} for brand ${brand.name}`);
 
             job.progress(15);
 
@@ -958,12 +986,11 @@ async function initializeQueues() {
 
             // Check quota and verify connection
             try {
-                const quotaCommand = new GetSendQuotaCommand({});
-                const quotaResponse = await sesClient.send(quotaCommand);
+                const quotaResponse = await emailProvider.getQuota();
 
                 // Calculate remaining quota
-                const remainingQuota = quotaResponse.Max24HourSend - quotaResponse.SentLast24Hours;
-                console.log(`SES Quota - Max: ${quotaResponse.Max24HourSend}, Used: ${quotaResponse.SentLast24Hours}, Remaining: ${remainingQuota}`);
+                const remainingQuota = quotaResponse.max24HourSend - quotaResponse.sentLast24Hours;
+                console.log(`Provider Quota - Max: ${quotaResponse.max24HourSend}, Used: ${quotaResponse.sentLast24Hours}, Remaining: ${remainingQuota}`);
 
                 // Get an estimate of contacts to be processed
                 let totalContactsEstimate = 0;
@@ -979,7 +1006,7 @@ async function initializeQueues() {
                 }
 
                 // Store the max send rate for rate limiting
-                const maxSendRate = quotaResponse.MaxSendRate || 10;
+                const maxSendRate = quotaResponse.maxSendRate || 10;
 
                 job.progress(20);
 
@@ -1064,12 +1091,11 @@ async function initializeQueues() {
                                     // Build recipient address
                                     const toAddress = contact.firstName ? `${contact.firstName} ${contact.lastName || ''} <${contact.email}>`.trim() : contact.email;
 
-                                    // Build raw email with List-Unsubscribe headers
-                                    const rawEmailContent = buildRawEmail({
+                                    // Send email using provider abstraction
+                                    const result = await emailProvider.sendRaw({
                                         from: `${fromName} <${fromEmail}>`,
                                         to: toAddress,
                                         replyTo: replyTo || fromEmail,
-                                        // subject: subject || campaign.subject,
                                         subject: campaign.subject || subject || 'No Subject',
                                         htmlContent: processedHtml,
                                         textContent: textContent || 'Empty campaign content',
@@ -1082,20 +1108,6 @@ async function initializeQueues() {
                                         ],
                                     });
 
-                                    // Send raw email
-                                    const result = await sesClient.send(
-                                        new SendRawEmailCommand({
-                                            RawMessage: {
-                                                Data: Buffer.from(rawEmailContent),
-                                            },
-                                            ConfigurationSetName: brand.sesConfigurationSet,
-                                            Tags: [
-                                                { Name: 'campaignId', Value: campaignId.toString() },
-                                                { Name: 'contactId', Value: contact._id.toString() },
-                                            ],
-                                        })
-                                    );
-
                                     // Add delivery event to be tracked
                                     deliveryEvents.push({
                                         contactId: contact._id,
@@ -1103,8 +1115,9 @@ async function initializeQueues() {
                                         email: contact.email,
                                         eventType: 'delivery',
                                         metadata: {
-                                            messageId: result.MessageId,
+                                            messageId: result.messageId,
                                             hasOneClickUnsubscribe: true,
+                                            provider: emailProvider.getName(),
                                         },
                                     });
 

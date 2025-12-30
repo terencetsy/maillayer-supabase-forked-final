@@ -26,7 +26,8 @@ export async function getBrandById(brandId, includeSecrets = false) {
     const query = Brand.findById(brandId);
 
     if (includeSecrets) {
-        query.select('+awsSecretKey');
+        // Include all provider secret keys
+        query.select('+awsSecretKey +sendgridApiKey +mailgunApiKey +smtpPassword');
     }
 
     const brand = await query.lean();

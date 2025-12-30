@@ -1,9 +1,37 @@
 import connectToDatabase from '@/lib/mongodb';
 import { getTemplateByApiKey, logTransactionalEmail } from '@/services/transactionalService';
-import AWS from 'aws-sdk';
 import Brand from '@/models/Brand';
 import { generateTrackingToken } from '@/services/trackingService';
 import config from '@/lib/config';
+import crypto from 'crypto';
+
+// Decrypt encrypted data using AES-256-CBC
+function decryptData(encryptedText, secretKey) {
+    try {
+        if (!encryptedText) return null;
+        if (!encryptedText.includes(':')) return encryptedText;
+
+        const key = crypto.scryptSync(secretKey || process.env.ENCRYPTION_KEY || 'default-fallback-key', 'salt', 32);
+        const parts = encryptedText.split(':');
+        if (parts.length !== 2) return encryptedText;
+
+        const iv = Buffer.from(parts[0], 'hex');
+        const encrypted = Buffer.from(parts[1], 'hex');
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (error) {
+        console.error('Decryption error:', error);
+        return encryptedText;
+    }
+}
+
+// Dynamic import for provider factory (CommonJS module)
+const getProviderFactory = async () => {
+    const ProviderFactory = require('@/lib/email-providers/ProviderFactory');
+    return ProviderFactory;
+};
 
 export default async function handler(req, res) {
     // Only allow POST requests
@@ -36,17 +64,28 @@ export default async function handler(req, res) {
             return res.status(403).json({ message: 'Template is not active', success: false });
         }
 
-        // Get brand to retrieve AWS credentials
-        const brand = await Brand.findById(template.brandId).select('+awsSecretKey');
+        // Get brand to retrieve email provider credentials
+        const brand = await Brand.findById(template.brandId).select('+awsSecretKey +sendgridApiKey +mailgunApiKey +smtpPassword');
 
         if (!brand) {
             return res.status(404).json({ message: 'Brand not found', success: false });
         }
 
-        // Check if AWS credentials are configured
-        if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
+        // Check if email provider credentials are configured
+        const provider = brand.emailProvider || 'ses';
+        if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
             return res.status(400).json({
                 message: 'AWS SES credentials not configured for this brand',
+                success: false,
+            });
+        } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+            return res.status(400).json({
+                message: 'SendGrid API key not configured for this brand',
+                success: false,
+            });
+        } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+            return res.status(400).json({
+                message: 'Mailgun credentials not configured for this brand',
                 success: false,
             });
         }
@@ -104,51 +143,34 @@ export default async function handler(req, res) {
             content = content + trackingPixel;
         }
 
-        // Initialize SES client
-        const ses = new AWS.SES({
-            region: brand.awsRegion,
-            accessKeyId: brand.awsAccessKey,
-            secretAccessKey: brand.awsSecretKey,
-        });
+        // Create email provider using factory
+        const ProviderFactory = await getProviderFactory();
+        const brandWithDecryptedSecrets = {
+            ...brand.toObject(),
+            awsSecretKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
+            sendgridApiKey: decryptData(brand.sendgridApiKey, process.env.ENCRYPTION_KEY),
+            mailgunApiKey: decryptData(brand.mailgunApiKey, process.env.ENCRYPTION_KEY),
+            smtpPassword: decryptData(brand.smtpPassword, process.env.ENCRYPTION_KEY),
+        };
+        const emailProvider = ProviderFactory.createProvider(brandWithDecryptedSecrets, { decryptSecrets: false });
 
         // Set up email parameters
         const fromName = template.fromName || brand.fromName || brand.name;
         const fromEmail = template.fromEmail || brand.fromEmail;
         const replyTo = template.replyTo || brand.replyToEmail || fromEmail;
 
-        const emailParams = {
-            Source: `${fromName} <${fromEmail}>`,
-            Destination: {
-                ToAddresses: [to],
-            },
-            Message: {
-                Subject: {
-                    Data: subject,
-                    Charset: 'UTF-8',
-                },
-                Body: {
-                    Html: {
-                        Data: content,
-                        Charset: 'UTF-8',
-                    },
-                },
-            },
-            ReplyToAddresses: [replyTo],
-            ConfigurationSetName: brand.sesConfigurationSet || undefined,
-            Tags: [
-                {
-                    Name: 'templateId',
-                    Value: template._id.toString(),
-                },
-                {
-                    Name: 'type',
-                    Value: 'transactional',
-                },
+        // Send email using provider abstraction
+        const sendResult = await emailProvider.send({
+            from: `${fromName} <${fromEmail}>`,
+            to,
+            subject,
+            html: content,
+            replyTo,
+            tags: [
+                { name: 'templateId', value: template._id.toString() },
+                { name: 'type', value: 'transactional' },
             ],
-        };
-
-        // Send email
-        const sendResult = await ses.sendEmail(emailParams).promise();
+        });
 
         // Log the transactional email
         await logTransactionalEmail({
@@ -161,7 +183,8 @@ export default async function handler(req, res) {
             status: 'sent',
             events: [], // Initialize empty events array for tracking
             metadata: {
-                messageId: sendResult.MessageId,
+                messageId: sendResult.messageId,
+                provider: emailProvider.getName(),
                 // Get IP and user agent from request
                 ipAddress: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
                 userAgent: req.headers['user-agent'],
@@ -171,7 +194,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             message: 'Email sent successfully',
-            messageId: sendResult.MessageId,
+            messageId: sendResult.messageId,
         });
     } catch (error) {
         console.error('Error sending transactional email:', error);
