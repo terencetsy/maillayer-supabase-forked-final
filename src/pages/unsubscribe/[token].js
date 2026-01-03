@@ -78,7 +78,10 @@ export default function Unsubscribe() {
             <>
                 <Head>
                     <title>Unsubscribe - Maillayer</title>
-                    <link rel="icon" href="/favicon.png" />
+                    <link
+                        rel="icon"
+                        href="/favicon.png"
+                    />
                 </Head>
                 <div className="unsubscribe-page">
                     <div className="unsubscribe-bg">
@@ -88,7 +91,10 @@ export default function Unsubscribe() {
                     <div className="unsubscribe-container">
                         <div className="unsubscribe-card">
                             <div className="loading-state">
-                                <Loader size={24} className="spin" />
+                                <Loader
+                                    size={24}
+                                    className="spin"
+                                />
                                 <span>Loading...</span>
                             </div>
                         </div>
@@ -105,7 +111,10 @@ export default function Unsubscribe() {
             <>
                 <Head>
                     <title>Unsubscribe - Error</title>
-                    <link rel="icon" href="/favicon.png" />
+                    <link
+                        rel="icon"
+                        href="/favicon.png"
+                    />
                 </Head>
                 <div className="unsubscribe-page">
                     <div className="unsubscribe-bg">
@@ -115,7 +124,10 @@ export default function Unsubscribe() {
                     <div className="unsubscribe-container">
                         <div className="unsubscribe-card">
                             <div className="unsubscribe-logo">
-                                <img src="https://c1.tablecdn.com/maillayer/logo.png" alt="Maillayer" />
+                                <img
+                                    src="https://c1.tablecdn.com/maillayer/logo.png"
+                                    alt="Maillayer"
+                                />
                             </div>
                             <div className="error-state">
                                 <div className="error-icon">
@@ -137,7 +149,10 @@ export default function Unsubscribe() {
         <>
             <Head>
                 <title>Unsubscribe - Maillayer</title>
-                <link rel="icon" href="/favicon.png" />
+                <link
+                    rel="icon"
+                    href="/favicon.png"
+                />
             </Head>
 
             <div className="unsubscribe-page">
@@ -149,7 +164,10 @@ export default function Unsubscribe() {
                 <div className="unsubscribe-container">
                     <div className="unsubscribe-card">
                         <div className="unsubscribe-logo">
-                            <img src="https://c1.tablecdn.com/maillayer/logo.png" alt="Maillayer" />
+                            <img
+                                src="https://c1.tablecdn.com/maillayer/logo.png"
+                                alt="Maillayer"
+                            />
                         </div>
 
                         {isUnsubscribed ? (
@@ -173,9 +191,6 @@ export default function Unsubscribe() {
                         ) : (
                             <>
                                 <div className="unsubscribe-header">
-                                    <div className="header-icon">
-                                        <MailX size={24} />
-                                    </div>
                                     <h1>Unsubscribe</h1>
                                     <p>We&apos;re sorry to see you go</p>
                                 </div>
@@ -195,7 +210,10 @@ export default function Unsubscribe() {
                                     </div>
                                 </div>
 
-                                <form onSubmit={handleUnsubscribe} className="unsubscribe-form">
+                                <form
+                                    onSubmit={handleUnsubscribe}
+                                    className="unsubscribe-form"
+                                >
                                     <div className="form-group">
                                         <label htmlFor="reason">Reason for unsubscribing</label>
                                         <select
@@ -212,10 +230,17 @@ export default function Unsubscribe() {
                                         </select>
                                     </div>
 
-                                    <button type="submit" className="unsubscribe-submit" disabled={loading}>
+                                    <button
+                                        type="submit"
+                                        className="unsubscribe-submit"
+                                        disabled={loading}
+                                    >
                                         {loading ? (
                                             <>
-                                                <Loader size={16} className="spin" />
+                                                <Loader
+                                                    size={16}
+                                                    className="spin"
+                                                />
                                                 <span>Processing...</span>
                                             </>
                                         ) : (

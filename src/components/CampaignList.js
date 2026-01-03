@@ -112,7 +112,7 @@ const CampaignList = ({ campaigns, brandId, onEditCampaign }) => {
                                     <div className="campaign-details">
                                         <div className="campaign-name-row">
                                             <span className="campaign-subject">{campaign.subject}</span>
-                                            {onEditCampaign && (
+                                            {onEditCampaign && campaign.status === 'draft' && (
                                                 <button
                                                     className="inline-edit-btn"
                                                     onClick={(e) => {
