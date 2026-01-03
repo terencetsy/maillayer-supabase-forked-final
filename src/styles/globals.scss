@@ -1551,7 +1551,7 @@ code:not(pre code) {
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: $dark-600;
+    background: #a5a5a5;
     border: 1px solid $border-color;
     display: flex;
     align-items: center;
@@ -6503,7 +6503,6 @@ code:not(pre code) {
     height: 200px;
     padding: 20px 0;
     position: relative;
-    border-bottom: 1px solid $border-color;
 }
 
 .chart-bar-wrapper {
@@ -6544,7 +6543,7 @@ code:not(pre code) {
     width: 100%;
     max-width: 32px;
     background: $dark-600;
-    border-radius: 4px 4px 0 0;
+    border-radius: 0;
     position: relative;
     min-height: 4px;
     transition: all 0.3s ease;
@@ -6556,8 +6555,8 @@ code:not(pre code) {
         left: 0;
         right: 0;
         height: 100%;
-        background: linear-gradient(180deg, $dark-300 0%, $dark-400 100%);
-        border-radius: 4px 4px 0 0;
+        background: #ffffff;
+        border-radius: 0;
         transition: all 0.3s ease;
     }
 
@@ -6565,7 +6564,7 @@ code:not(pre code) {
         background: $dark-500;
 
         .chart-bar-fill {
-            background: linear-gradient(180deg, $text-primary 0%, $dark-200 100%);
+            background: #ffffff;
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
         }
     }
