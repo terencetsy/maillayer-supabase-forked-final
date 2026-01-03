@@ -14,6 +14,10 @@ export default function EditCampaign() {
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
+        trackingConfig: {
+            trackOpens: true,
+            trackClicks: true,
+        },
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -75,6 +79,10 @@ export default function EditCampaign() {
             setFormData({
                 name: data.name || '',
                 subject: data.subject || '',
+                trackingConfig: data.trackingConfig || {
+                    trackOpens: true,
+                    trackClicks: true,
+                },
             });
         } catch (error) {
             console.error('Error fetching campaign details:', error);
@@ -209,6 +217,46 @@ export default function EditCampaign() {
                                     placeholder="Email Subject"
                                     disabled={isSaving}
                                 />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Email Tracking</label>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackOpens ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackOpens: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track email opens</span>
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackClicks ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackClicks: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track link clicks</span>
+                                </label>
                             </div>
                         </div>
 

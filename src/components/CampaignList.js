@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { formatDistance } from 'date-fns';
 import { CornerLeftUp, Copy, Trash2, Pencil, Eye, Mail, PieChart, UserMinus } from 'lucide-react';
 
-const CampaignList = ({ campaigns, brandId }) => {
+const CampaignList = ({ campaigns, brandId, onEditCampaign }) => {
     const handleDuplicate = async (campaignId, campaignName) => {
         try {
             const response = await fetch(`/api/brands/${brandId}/campaigns/${campaignId}/duplicate`, {
@@ -110,7 +110,22 @@ const CampaignList = ({ campaigns, brandId }) => {
                                 <div className="campaign-info">
                                     <div className="email-icon">{renderStatusBadge(campaign.status)}</div>
                                     <div className="campaign-details">
-                                        <div className="campaign-subject">{campaign.subject}</div>
+                                        <div className="campaign-name-row">
+                                            <span className="campaign-subject">{campaign.subject}</span>
+                                            {onEditCampaign && (
+                                                <button
+                                                    className="inline-edit-btn"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        onEditCampaign(campaign);
+                                                    }}
+                                                    title="Edit campaign details"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -257,6 +272,37 @@ const CampaignList = ({ campaigns, brandId }) => {
                 .status-badge.warmup {
                     background-color: #dbeafe;
                     color: #1e40af;
+                }
+
+                .campaign-name-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .campaign-name-row :global(.inline-edit-btn) {
+                    opacity: 0;
+                    visibility: hidden;
+                    transition: opacity 0.15s ease, visibility 0.15s ease;
+                    background: none;
+                    border: none;
+                    padding: 4px;
+                    cursor: pointer;
+                    color: #666;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 4px;
+                }
+
+                .campaign-name-row :global(.inline-edit-btn):hover {
+                    color: #333;
+                    background-color: #f0f0f0;
+                }
+
+                tr:hover .campaign-name-row :global(.inline-edit-btn) {
+                    opacity: 1;
+                    visibility: visible;
                 }
             `}</style>
         </div>

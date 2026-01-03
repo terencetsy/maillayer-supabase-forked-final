@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { Search, PlusCircle, Zap, Users, CheckCircle, Pause, Trash, Edit, Play, Settings, X, FileText } from 'lucide-react';
+import { Search, PlusCircle, Zap, Users, CheckCircle, Pause, Trash, Edit, Play, Settings, X, FileText, Loader } from 'lucide-react';
 import { getEmailSequences, deleteEmailSequence, createEmailSequence } from '@/services/clientEmailSequenceService';
 
 export default function EmailSequences() {
@@ -319,7 +319,6 @@ export default function EmailSequences() {
 }
 
 // Create Sequence Modal Component
-// Create Sequence Modal Component
 function CreateSequenceModal({ onClose, onCreate, isCreating }) {
     const [name, setName] = useState('');
 
@@ -329,72 +328,61 @@ function CreateSequenceModal({ onClose, onCreate, isCreating }) {
     };
 
     return (
-        <div
-            className="form-modal-overlay"
-            onClick={onClose}
-        >
-            <div
-                className="modal-form-container"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="modal-form-header">
-                    <h2>Create Email Sequence</h2>
-                    <button
-                        className="modal-form-close"
-                        onClick={onClose}
-                    >
-                        ×
-                    </button>
-                </div>
+        <div className="form-modal-overlay" onClick={onClose}>
+            <div className="form-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-form-container">
+                    <div className="modal-form-header">
+                        <h2>Create Email Sequence</h2>
+                        <button className="modal-form-close" onClick={onClose} type="button">
+                            <X size={20} />
+                        </button>
+                    </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="modal-form-body">
-                        <p className="modal-form-description">Give your sequence a name to get started. You&apos;ll configure the trigger and emails next.</p>
-
+                    <form onSubmit={handleSubmit} className="form">
                         <div className="form-group">
-                            <label className="form-label">
+                            <label htmlFor="sequence-name" className="form-label">
                                 Sequence Name<span className="form-required">*</span>
                             </label>
                             <input
+                                id="sequence-name"
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="Welcome Series"
-                                className="form-input"
                                 autoFocus
                                 required
+                                disabled={isCreating}
+                                className="form-input"
                             />
+                            <p className="form-help">Choose a descriptive name for your automation</p>
                         </div>
-                    </div>
 
-                    <div className="form-actions">
-                        <button
-                            type="button"
-                            className="button button--secondary"
-                            onClick={onClose}
-                            disabled={isCreating}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="button button--primary"
-                            disabled={isCreating || !name.trim()}
-                        >
-                            {isCreating ? (
-                                <>
-                                    <span className="spinner-icon">⟳</span>
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <PlusCircle size={16} />
-                                    Create & Configure
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
+                        <div className="form-actions">
+                            <button
+                                type="button"
+                                className="button button--secondary"
+                                onClick={onClose}
+                                disabled={isCreating}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="button button--primary"
+                                disabled={isCreating || !name.trim()}
+                            >
+                                {isCreating ? (
+                                    <>
+                                        <Loader size={16} className="spinner-icon" />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    'Create Sequence'
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

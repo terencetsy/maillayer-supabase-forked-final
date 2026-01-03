@@ -300,6 +300,7 @@ export default async function handler(req, res) {
                     contactListIds,
                     segmentIds, // NEW: Support for segments
                     warmupConfig,
+                    trackingConfig,
                 } = req.body;
 
                 const campaign = await getCampaignById(id, brandId);
@@ -319,6 +320,7 @@ export default async function handler(req, res) {
                 if (replyTo) updateData.replyTo = replyTo;
                 if (contactListIds) updateData.contactListIds = contactListIds;
                 if (segmentIds !== undefined) updateData.segmentIds = segmentIds; // NEW
+                if (trackingConfig) updateData.trackingConfig = trackingConfig;
 
                 // Sending or scheduling functionality
                 if (status === 'sending' || status === 'scheduled' || scheduleType === 'warmup') {

@@ -126,21 +126,24 @@ export default async function handler(req, res) {
             content = content.replace(regex, variables[key]);
         });
 
-        // Generate tracking token
-        const trackingToken = generateTrackingToken(
-            template._id.toString(),
-            'txn', // Use 'txn' as contactId for transactional emails
-            to
-        );
+        // Add tracking pixel if open tracking is enabled (default: true for backward compatibility)
+        if (template.trackingConfig?.trackOpens !== false) {
+            // Generate tracking token
+            const trackingToken = generateTrackingToken(
+                template._id.toString(),
+                'txn', // Use 'txn' as contactId for transactional emails
+                to
+            );
 
-        // Create a tracking pixel with proper URL encoding
-        const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${encodeURIComponent(trackingToken)}&templateId=${encodeURIComponent(template._id)}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
+            // Create a tracking pixel with proper URL encoding
+            const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${encodeURIComponent(trackingToken)}&templateId=${encodeURIComponent(template._id)}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
 
-        // Add tracking pixel at the end of the content, right before the closing body tag if possible
-        if (content.includes('</body>')) {
-            content = content.replace('</body>', `${trackingPixel}</body>`);
-        } else {
-            content = content + trackingPixel;
+            // Add tracking pixel at the end of the content, right before the closing body tag if possible
+            if (content.includes('</body>')) {
+                content = content.replace('</body>', `${trackingPixel}</body>`);
+            } else {
+                content = content + trackingPixel;
+            }
         }
 
         // Create email provider using factory

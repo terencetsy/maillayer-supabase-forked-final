@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         // POST request - create new template
         if (req.method === 'POST') {
             try {
-                const { name, subject, content, fromName, fromEmail, replyTo, variables = [] } = req.body;
+                const { name, subject, content, fromName, fromEmail, replyTo, variables = [], trackingConfig } = req.body;
 
                 if (!name || !subject) {
                     return res.status(400).json({ message: 'Missing required fields' });
@@ -77,6 +77,7 @@ export default async function handler(req, res) {
                     status: 'draft',
                     apiKey,
                     variables: templateVariables,
+                    trackingConfig: trackingConfig || { trackOpens: true, trackClicks: true },
                 };
 
                 const newTemplate = await createTemplate(templateData);

@@ -5,6 +5,10 @@ export default function TransactionalTemplateForm({ brand, onCancel, onSuccess }
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
+        trackingConfig: {
+            trackOpens: true,
+            trackClicks: true,
+        },
     });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -111,6 +115,47 @@ export default function TransactionalTemplateForm({ brand, onCancel, onSuccess }
                                 required
                             />
                             <p className="hint-text">Use variables like {`{{firstName}}`} in your subject</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Email Tracking</label>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackOpens ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackOpens: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track email opens</span>
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackClicks ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackClicks: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track link clicks</span>
+                                </label>
+                            </div>
+                            <p className="hint-text">Control whether to track opens and clicks for this template</p>
                         </div>
 
                         <div className="modal-actions">

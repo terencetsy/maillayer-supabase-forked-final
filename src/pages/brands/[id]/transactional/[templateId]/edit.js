@@ -4,8 +4,7 @@ import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import BrandLayout from '@/components/BrandLayout';
-import { ArrowLeft, Save, Eye, AlertCircle } from 'lucide-react';
-import TransactionalTemplateForm from '@/components/TransactionalTemplateForm';
+import { ArrowLeft, Loader, AlertCircle } from 'lucide-react';
 
 export default function EditTransactionalTemplate() {
     const { data: session, status } = useSession();
@@ -13,7 +12,14 @@ export default function EditTransactionalTemplate() {
     const { id, templateId } = router.query;
 
     const [brand, setBrand] = useState(null);
-    const [template, setTemplate] = useState(null);
+    const [formData, setFormData] = useState({
+        name: '',
+        subject: '',
+        trackingConfig: {
+            trackOpens: true,
+            trackClicks: true,
+        },
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
@@ -71,7 +77,14 @@ export default function EditTransactionalTemplate() {
             }
 
             const data = await res.json();
-            setTemplate(data);
+            setFormData({
+                name: data.name || '',
+                subject: data.subject || '',
+                trackingConfig: data.trackingConfig || {
+                    trackOpens: true,
+                    trackClicks: true,
+                },
+            });
         } catch (error) {
             console.error('Error fetching template details:', error);
             setError(error.message);
@@ -80,7 +93,22 @@ export default function EditTransactionalTemplate() {
         }
     };
 
-    const handleSubmit = async (formData) => {
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!formData.name || !formData.subject) {
+            setError('Please fill in all required fields');
+            return;
+        }
+
         setIsSaving(true);
         setError('');
         setSuccess('');
@@ -102,13 +130,9 @@ export default function EditTransactionalTemplate() {
 
             setSuccess('Template updated successfully');
 
-            // Refresh template data
-            fetchTemplateDetails();
-
-            // Clear success message after 3 seconds
             setTimeout(() => {
-                setSuccess('');
-            }, 3000);
+                router.push(`/brands/${id}/transactional/${templateId}`);
+            }, 1500);
         } catch (error) {
             console.error('Error updating template:', error);
             setError(error.message);
@@ -117,7 +141,7 @@ export default function EditTransactionalTemplate() {
         }
     };
 
-    if (isLoading || !brand || !template) {
+    if (isLoading || !brand) {
         return (
             <BrandLayout brand={brand}>
                 <div className="loading-section">
@@ -131,37 +155,121 @@ export default function EditTransactionalTemplate() {
     return (
         <BrandLayout brand={brand}>
             <div className="template-edit-container">
-                <div className="edit-header">
-                    <Link
-                        href={`/brands/${id}/transactional/${templateId}`}
-                        className="back-link"
-                    >
-                        <ArrowLeft size={16} />
-                        <span>Back to Template Details</span>
-                    </Link>
-                    <h1>Edit Transactional Template</h1>
+                <Link href={`/brands/${id}/transactional/${templateId}`} className="back-link">
+                    <ArrowLeft size={16} />
+                    <span>Back to template</span>
+                </Link>
+
+                <div className="edit-form-container">
+                    <div className="form-header">
+                        <h1>Edit Template</h1>
+                    </div>
+
+                    {error && (
+                        <div className="form-error">
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="form-success">
+                            <span>{success}</span>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="modern-form">
+                        <div className="form-group">
+                            <label htmlFor="name">
+                                Template Name<span className="required">*</span>
+                            </label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="name"
+                                    name="name"
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    placeholder="Template Name"
+                                    disabled={isSaving}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="subject">
+                                Email Subject<span className="required">*</span>
+                            </label>
+                            <div className="input-wrapper">
+                                <input
+                                    id="subject"
+                                    name="subject"
+                                    type="text"
+                                    value={formData.subject}
+                                    onChange={handleChange}
+                                    placeholder="Email Subject"
+                                    disabled={isSaving}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Email Tracking</label>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackOpens ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackOpens: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track email opens</span>
+                                </label>
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.trackingConfig?.trackClicks ?? true}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                trackingConfig: {
+                                                    ...prev.trackingConfig,
+                                                    trackClicks: e.target.checked,
+                                                },
+                                            }))
+                                        }
+                                        disabled={isSaving}
+                                    />
+                                    <span>Track link clicks</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="form-actions">
+                            <Link href={`/brands/${id}/transactional/${templateId}`} className="btn btn-secondary">
+                                Cancel
+                            </Link>
+                            <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                                {isSaving ? (
+                                    <>
+                                        <Loader size={16} className="spinner" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save Changes'
+                                )}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                {error && (
-                    <div className="alert alert-error">
-                        <AlertCircle size={20} />
-                        <span>{error}</span>
-                    </div>
-                )}
-
-                {success && (
-                    <div className="alert alert-success">
-                        <span>{success}</span>
-                    </div>
-                )}
-
-                <TransactionalTemplateForm
-                    brand={brand}
-                    initialValues={template}
-                    onSubmit={handleSubmit}
-                    isSaving={isSaving}
-                    isEditing={true}
-                />
             </div>
         </BrandLayout>
     );

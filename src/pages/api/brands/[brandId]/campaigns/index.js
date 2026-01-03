@@ -71,7 +71,7 @@ export default async function handler(req, res) {
             }
 
             try {
-                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt } = req.body;
+                const { name, subject, content, fromName, fromEmail, replyTo, status, scheduleType, scheduledAt, trackingConfig } = req.body;
 
                 if (!name || !subject) {
                     return res.status(400).json({ message: 'Missing required fields' });
@@ -89,6 +89,7 @@ export default async function handler(req, res) {
                     status: status || 'draft',
                     scheduleType: scheduleType || 'send_now',
                     scheduledAt: scheduledAt || null,
+                    trackingConfig: trackingConfig || { trackOpens: true, trackClicks: true },
                 };
 
                 const newCampaign = await createCampaign(campaignData);

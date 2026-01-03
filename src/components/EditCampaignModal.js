@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader, AlertCircle } from 'lucide-react';
 
-export default function CampaignForm({ brand, onCancel, onSuccess }) {
-    const initialFormData = {
+export default function EditCampaignModal({ campaign, brandId, onCancel, onSuccess }) {
+    const [formData, setFormData] = useState({
         name: '',
         subject: '',
         trackingConfig: {
             trackOpens: true,
             trackClicks: true,
         },
-    };
-
-    const [formData, setFormData] = useState(initialFormData);
+    });
+    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (campaign) {
+            setFormData({
+                name: campaign.name || '',
+                subject: campaign.subject || '',
+                trackingConfig: campaign.trackingConfig || {
+                    trackOpens: true,
+                    trackClicks: true,
+                },
+            });
+        }
+    }, [campaign]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -26,18 +37,17 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Validate form
         if (!formData.name || !formData.subject) {
             setError('Please fill in all required fields');
             return;
         }
 
-        setIsLoading(true);
+        setIsSaving(true);
         setError('');
 
         try {
-            const response = await fetch(`/api/brands/${brand._id}/campaigns`, {
-                method: 'POST',
+            const response = await fetch(`/api/brands/${brandId}/campaigns/${campaign._id}`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -46,26 +56,24 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.message || 'Failed to create campaign');
+                throw new Error(data.message || 'Failed to update campaign');
             }
-
-            const campaign = await response.json();
 
             if (onSuccess) {
-                onSuccess(campaign);
+                onSuccess();
             }
         } catch (error) {
-            console.error('Error creating campaign:', error);
+            console.error('Error updating campaign:', error);
             setError(error.message || 'An unexpected error occurred');
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
     };
 
     return (
         <div className="modal-form-container">
             <div className="modal-form-header">
-                <h2>Create a New Campaign</h2>
+                <h2>Edit Campaign</h2>
                 <button
                     className="modal-form-close"
                     onClick={onCancel}
@@ -83,15 +91,9 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                 </div>
             )}
 
-            <form
-                onSubmit={handleSubmit}
-                className="form"
-            >
+            <form onSubmit={handleSubmit} className="form">
                 <div className="form-group">
-                    <label
-                        htmlFor="name"
-                        className="form-label"
-                    >
+                    <label htmlFor="name" className="form-label">
                         Campaign Name<span className="form-required">*</span>
                     </label>
                     <input
@@ -100,18 +102,15 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                         type="text"
                         value={formData.name}
                         onChange={handleChange}
-                        placeholder="Fall Sale 2025"
-                        disabled={isLoading}
+                        placeholder="Campaign Name"
+                        disabled={isSaving}
                         className="form-input"
                     />
                     <p className="form-help">Internal name to identify your campaign</p>
                 </div>
 
                 <div className="form-group">
-                    <label
-                        htmlFor="subject"
-                        className="form-label"
-                    >
+                    <label htmlFor="subject" className="form-label">
                         Email Subject<span className="form-required">*</span>
                     </label>
                     <input
@@ -120,8 +119,8 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                         type="text"
                         value={formData.subject}
                         onChange={handleChange}
-                        placeholder="Don't miss our fall sale! 20% off everything"
-                        disabled={isLoading}
+                        placeholder="Email Subject"
+                        disabled={isSaving}
                         className="form-input"
                     />
                     <p className="form-help">This will appear as the subject line of your email</p>
@@ -143,7 +142,7 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                                         },
                                     }))
                                 }
-                                disabled={isLoading}
+                                disabled={isSaving}
                             />
                             <span>Track email opens</span>
                         </label>
@@ -160,7 +159,7 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                                         },
                                     }))
                                 }
-                                disabled={isLoading}
+                                disabled={isSaving}
                             />
                             <span>Track link clicks</span>
                         </label>
@@ -173,25 +172,22 @@ export default function CampaignForm({ brand, onCancel, onSuccess }) {
                         type="button"
                         className="button button--secondary"
                         onClick={onCancel}
-                        disabled={isLoading}
+                        disabled={isSaving}
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         className="button button--primary"
-                        disabled={isLoading}
+                        disabled={isSaving}
                     >
-                        {isLoading ? (
+                        {isSaving ? (
                             <>
-                                <Loader
-                                    size={16}
-                                    className="spinner-icon"
-                                />
-                                Creating...
+                                <Loader size={16} className="spinner-icon" />
+                                Saving...
                             </>
                         ) : (
-                            'Create Campaign'
+                            'Save Changes'
                         )}
                     </button>
                 </div>

@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         // PUT request - update a template
         if (req.method === 'PUT') {
             try {
-                const { name, subject, content, fromName, fromEmail, replyTo, status, variables } = req.body;
+                const { name, subject, content, fromName, fromEmail, replyTo, status, variables, trackingConfig } = req.body;
 
                 const template = await getTemplateById(templateId, brandId);
 
@@ -73,6 +73,7 @@ export default async function handler(req, res) {
                 if (fromEmail) updateData.fromEmail = fromEmail;
                 if (replyTo) updateData.replyTo = replyTo;
                 if (status) updateData.status = status;
+                if (trackingConfig) updateData.trackingConfig = trackingConfig;
 
                 // Update variables based on content
                 if (content && (!variables || variables.length === 0)) {

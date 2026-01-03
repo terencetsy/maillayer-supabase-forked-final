@@ -12,7 +12,8 @@
       "Bash(npx next build:*)",
       "Bash(xargs ls:*)",
       "Bash(wc:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(grep:*)"
     ]
   }
 }

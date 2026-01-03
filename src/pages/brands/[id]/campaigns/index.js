@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import BrandLayout from '@/components/BrandLayout';
 import CampaignForm from '@/components/CampaignForm';
 import CampaignList from '@/components/CampaignList';
+import EditCampaignModal from '@/components/EditCampaignModal';
 import { Mail, Plus, PlusCircle, Search } from 'lucide-react';
 
 export default function BrandCampaigns() {
@@ -28,6 +29,7 @@ export default function BrandCampaigns() {
     const [error, setError] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [editingCampaign, setEditingCampaign] = useState(null);
 
     useEffect(() => {
         if (status === 'unauthenticated') {
@@ -172,6 +174,19 @@ export default function BrandCampaigns() {
         setShowCreateForm(false);
     };
 
+    const handleEditCampaign = (campaign) => {
+        setEditingCampaign(campaign);
+    };
+
+    const handleEditCancel = () => {
+        setEditingCampaign(null);
+    };
+
+    const handleEditSuccess = () => {
+        fetchCampaigns();
+        setEditingCampaign(null);
+    };
+
     const handlePageChange = (newPage) => {
         setPagination((prev) => ({
             ...prev,
@@ -245,6 +260,20 @@ export default function BrandCampaigns() {
                     </div>
                 )}
 
+                {/* Edit Campaign Modal */}
+                {editingCampaign && (
+                    <div className="form-modal-overlay">
+                        <div className="form-modal">
+                            <EditCampaignModal
+                                campaign={editingCampaign}
+                                brandId={id}
+                                onCancel={handleEditCancel}
+                                onSuccess={handleEditSuccess}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {/* Campaigns List or Empty State */}
                 <>
                     {isLoading ? (
@@ -287,6 +316,7 @@ export default function BrandCampaigns() {
                                             <CampaignList
                                                 campaigns={filteredCampaigns}
                                                 brandId={id}
+                                                onEditCampaign={handleEditCampaign}
                                             />
 
                                             {/* Pagination Controls */}

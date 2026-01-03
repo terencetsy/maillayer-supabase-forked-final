@@ -77,6 +77,16 @@ const TransactionalTemplateSchema = new mongoose.Schema({
             default: 0,
         },
     },
+    trackingConfig: {
+        trackOpens: {
+            type: Boolean,
+            default: true,
+        },
+        trackClicks: {
+            type: Boolean,
+            default: true,
+        },
+    },
     createdAt: {
         type: Date,
         default: Date.now,

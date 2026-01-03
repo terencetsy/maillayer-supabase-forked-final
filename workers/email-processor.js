@@ -398,31 +398,39 @@ function generateTrackingToken(campaignId, contactId, email) {
     return crypto.createHash('sha256').update(dataToHash).digest('hex');
 }
 
-function processHtml(html, campaignId, contactId, email, trackingDomain = '', brandId) {
+function processHtml(html, campaignId, contactId, email, trackingDomain = '', brandId, trackingConfig = null) {
     // Fallback to using the API routes if tracking domain is not provided
     const domain = trackingDomain || process.env.TRACKING_DOMAIN || '';
 
-    // Generate tracking token
-    const token = generateTrackingToken(campaignId, contactId, email);
+    // Determine if tracking is enabled (default to true for backward compatibility)
+    const trackOpens = trackingConfig?.trackOpens !== false;
+    const trackClicks = trackingConfig?.trackClicks !== false;
+
+    // Generate tracking token (only if any tracking is enabled)
+    const token = (trackOpens || trackClicks) ? generateTrackingToken(campaignId, contactId, email) : null;
 
     // Base tracking parameters
-    const trackingParams = `cid=${encodeURIComponent(campaignId)}&lid=${encodeURIComponent(contactId)}&e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}`;
+    const trackingParams = token ? `cid=${encodeURIComponent(campaignId)}&lid=${encodeURIComponent(contactId)}&e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}` : '';
 
     // Parse HTML
     const $ = cheerio.load(html);
 
-    // Process all links to add click tracking
-    $('a').each(function () {
-        const originalUrl = $(this).attr('href');
-        if (originalUrl && !originalUrl.startsWith('mailto:') && !originalUrl.startsWith('#')) {
-            const trackingUrl = `${domain}/api/tracking/click?${trackingParams}&url=${encodeURIComponent(originalUrl)}`;
-            $(this).attr('href', trackingUrl);
-        }
-    });
+    // Process all links to add click tracking (only if click tracking is enabled)
+    if (trackClicks) {
+        $('a').each(function () {
+            const originalUrl = $(this).attr('href');
+            if (originalUrl && !originalUrl.startsWith('mailto:') && !originalUrl.startsWith('#')) {
+                const trackingUrl = `${domain}/api/tracking/click?${trackingParams}&url=${encodeURIComponent(originalUrl)}`;
+                $(this).attr('href', trackingUrl);
+            }
+        });
+    }
 
-    // Add tracking pixel at the end of the email
-    const trackingPixel = `<img src="${domain}/api/tracking/open?${trackingParams}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
-    $('body').append(trackingPixel);
+    // Add tracking pixel at the end of the email (only if open tracking is enabled)
+    if (trackOpens) {
+        const trackingPixel = `<img src="${domain}/api/tracking/open?${trackingParams}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
+        $('body').append(trackingPixel);
+    }
 
     // Generate unsubscribe token
     const unsubscribeToken = generateUnsubscribeToken(contactId, brandId, campaignId);
@@ -749,8 +757,8 @@ async function initializeQueues() {
                 await limiter.removeTokens(1);
 
                 try {
-                    // Add tracking to HTML content
-                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
+                    // Add tracking to HTML content (respects campaign trackingConfig)
+                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString(), campaign.trackingConfig);
 
                     // Extract plain text
                     const textContent = extractTextFromHtml(processedHtml);
@@ -1079,8 +1087,8 @@ async function initializeQueues() {
                                 await limiter.removeTokens(1);
 
                                 try {
-                                    // Add tracking to HTML content
-                                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString());
+                                    // Add tracking to HTML content (respects campaign trackingConfig)
+                                    const processedHtml = processHtml(campaign.content || '<p>Empty campaign content</p>', campaignId.toString(), contact._id.toString(), contact.email, trackingDomain, brandId.toString(), campaign.trackingConfig);
 
                                     // Extract plain text for text-only clients
                                     const textContent = extractTextFromHtml(processedHtml);

@@ -116,6 +116,16 @@ const CampaignSchema = new mongoose.Schema({
         },
         default: null,
     },
+    trackingConfig: {
+        trackOpens: {
+            type: Boolean,
+            default: true,
+        },
+        trackClicks: {
+            type: Boolean,
+            default: true,
+        },
+    },
     createdAt: {
         type: Date,
         default: Date.now,
