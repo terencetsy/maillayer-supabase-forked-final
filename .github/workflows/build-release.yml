@@ -37,6 +37,17 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Verify build output
+        run: |
+          echo "Checking .next folder..."
+          ls -la .next/ || echo ".next folder not found!"
+          echo ""
+          echo "Checking .next/standalone (if using standalone output)..."
+          ls -la .next/standalone/ 2>/dev/null || echo "No standalone build"
+          echo ""
+          echo "Build folder size:"
+          du -sh .next/ || echo "Cannot calculate size"
+
       - name: Get version
         id: version
         run: |
@@ -51,14 +62,36 @@ jobs:
           # Create release directory
           mkdir -p release/maillayer
 
+          # Verify .next exists before copying
+          if [ ! -d ".next" ]; then
+            echo "ERROR: .next directory not found! Build may have failed."
+            exit 1
+          fi
+
           # Copy built application
+          echo "Copying .next folder..."
           cp -r .next release/maillayer/
+
+          echo "Copying public folder..."
           cp -r public release/maillayer/
+
+          echo "Copying workers folder..."
           cp -r workers release/maillayer/
+
+          echo "Copying config files..."
           cp package.json release/maillayer/
           cp package-lock.json release/maillayer/
           cp ecosystem.config.js release/maillayer/
           cp .env.example release/maillayer/
+
+          # Verify contents
+          echo ""
+          echo "Release folder contents:"
+          ls -la release/maillayer/
+
+          echo ""
+          echo ".next folder contents:"
+          ls -la release/maillayer/.next/ | head -20
 
           # Create production package.json (remove devDependencies)
           node -e "
