@@ -1,0 +1,125 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 1.0.0)'
+        required: true
+
+env:
+  NODE_VERSION: '20'
+  # Public repo where releases will be published
+  RELEASE_REPO: mddanishyusuf/maillayer-releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare release files
+        run: |
+          # Create release directory
+          mkdir -p release/maillayer
+
+          # Copy built application
+          cp -r .next release/maillayer/
+          cp -r public release/maillayer/
+          cp -r workers release/maillayer/
+          cp package.json release/maillayer/
+          cp package-lock.json release/maillayer/
+          cp ecosystem.config.js release/maillayer/
+          cp .env.example release/maillayer/
+
+          # Create production package.json (remove devDependencies)
+          node -e "
+            const pkg = require('./package.json');
+            delete pkg.devDependencies;
+            pkg.scripts = {
+              start: 'next start',
+              production: 'NODE_ENV=production pm2-runtime start ecosystem.config.js'
+            };
+            require('fs').writeFileSync('release/maillayer/package.json', JSON.stringify(pkg, null, 2));
+          "
+
+          # Create version file
+          echo "${{ steps.version.outputs.VERSION }}" > release/maillayer/VERSION
+
+          # Create tarball
+          cd release
+          tar -czf maillayer.tar.gz maillayer
+
+          # Calculate checksum
+          sha256sum maillayer.tar.gz > maillayer.tar.gz.sha256
+
+          # Show file size
+          ls -lh maillayer.tar.gz
+
+      - name: Create Release on Public Repo
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ env.RELEASE_REPO }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Maillayer ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Maillayer ${{ steps.version.outputs.VERSION }}
+
+            ### Installation
+
+            ```bash
+            curl -fsSL https://get.maillayer.com/install.sh | sudo bash -s -- \
+                --license YOUR-LICENSE-KEY \
+                --domain mail.yourdomain.com
+            ```
+
+            ### Checksums
+
+            See `maillayer.tar.gz.sha256` for SHA256 checksum.
+          files: |
+            release/maillayer.tar.gz
+            release/maillayer.tar.gz.sha256
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Generate build summary
+        run: |
+          echo "## Build Successful! 📦" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Released to:** [${{ env.RELEASE_REPO }}](https://github.com/${{ env.RELEASE_REPO }}/releases)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**File size:** $(du -h release/maillayer.tar.gz | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**SHA256:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat release/maillayer.tar.gz.sha256 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

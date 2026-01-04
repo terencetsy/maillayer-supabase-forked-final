@@ -13,7 +13,9 @@
       "Bash(xargs ls:*)",
       "Bash(wc:*)",
       "Bash(npm uninstall:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
