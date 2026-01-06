@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { hasAdminUser } from './services/userService';
+
 
 export async function middleware(req) {
     const { pathname } = req.nextUrl;
@@ -8,17 +8,25 @@ export async function middleware(req) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const isAuthenticated = !!token;
 
-    let adminExists = false;
-    try {
-        adminExists = await hasAdminUser();
-    } catch (error) {
-        console.error('Error checking admin existence:', error);
-    }
-
     const publicPaths = ['/login'];
     const isPublicPath = publicPaths.includes(pathname);
 
+    // Helper to check for admin existence via API
+    const checkAdminExists = async () => {
+        try {
+            const res = await fetch(`${req.nextUrl.origin}/api/auth/check-admin`);
+            if (!res.ok) return false;
+            const data = await res.json();
+            return !!data.adminExists;
+        } catch (error) {
+            console.error('Error checking admin existence via API:', error);
+            // Default to false or handle as needed - fail safe
+            return false;
+        }
+    };
+
     if (pathname === '/signup') {
+        const adminExists = await checkAdminExists();
         if (adminExists) {
             return NextResponse.redirect(new URL('/login', req.url));
         }
@@ -29,6 +37,7 @@ export async function middleware(req) {
         if (isAuthenticated) {
             return NextResponse.redirect(new URL('/brands', req.url));
         } else {
+            const adminExists = await checkAdminExists();
             if (!adminExists) {
                 return NextResponse.redirect(new URL('/signup', req.url));
             }
