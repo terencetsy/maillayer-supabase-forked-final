@@ -1,19 +1,23 @@
-import { SessionProvider } from 'next-auth/react';
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { useState } from 'react';
 import Head from 'next/head';
 import '../styles/globals.scss';
 import '@/styles/sequence-builder.scss';
 import config from '@/lib/config';
 
+// Ensure NEXTAUTH_URL equivalent isn't needed for Supabase, but keeping config init if essential
 if (typeof window === 'undefined' && !process.env.NEXTAUTH_URL) {
     process.env.NEXTAUTH_URL = config.baseUrl;
 }
 
-function MyApp({ Component, pageProps: { session, ...pageProps } }) {
+function MyApp({ Component, pageProps }) {
+    const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+
     return (
-        <SessionProvider
-            session={session}
-            refetchInterval={0}
-            refetchOnWindowFocus={false}
+        <SessionContextProvider
+            supabaseClient={supabaseClient}
+            initialSession={pageProps.initialSession}
         >
             <Head>
                 <meta
@@ -23,7 +27,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
                 <title>Maillayer - Email Marketing Platform</title>
             </Head>
             <Component {...pageProps} />
-        </SessionProvider>
+        </SessionContextProvider>
     );
 }
 

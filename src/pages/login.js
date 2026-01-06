@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { authHelpers } from '@/lib/auth';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -24,18 +24,16 @@ export default function Login() {
         setError('');
 
         try {
-            const result = await signIn('credentials', {
-                redirect: false,
-                email,
-                password,
-            });
+            // Using Supabase auth helper
+            const { data, error: signInError } = await authHelpers.signIn(email, password);
 
-            if (result.error) {
-                setError(result.error);
+            if (signInError) {
+                setError(signInError.message);
                 setIsLoading(false);
                 return;
             }
 
+            // Successful login
             router.push('/brands');
         } catch (error) {
             console.error('Login error:', error);

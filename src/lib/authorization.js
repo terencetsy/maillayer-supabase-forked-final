@@ -1,5 +1,5 @@
-import { getBrandById } from '@/services/brandService';
-import { checkBrandAccess } from '@/services/teamMemberService';
+import { supabase } from '@/lib/supabase';
+import { brandsDb } from '@/lib/db/brands';
 
 // Permission definitions
 export const PERMISSIONS = {
@@ -58,34 +58,49 @@ const ROLE_PERMISSIONS = {
  * Check if a user has access to a brand and return their role/permissions
  */
 export async function getBrandAccessInfo(brandId, userId) {
-    const brand = await getBrandById(brandId);
+    try {
+        const brand = await brandsDb.getById(brandId);
 
-    if (!brand) {
+        if (!brand) {
+            return null;
+        }
+
+        // Check if owner
+        // Ensure standard string comparison for UUIDs
+        if (brand.user_id === userId) {
+            return {
+                role: 'owner',
+                permissions: ROLE_PERMISSIONS.owner,
+                brand,
+            };
+        }
+
+        // Check if team member
+        const { data: teamMember, error } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('brand_id', brandId)
+            .eq('user_id', userId)
+            .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "Relation not found" or "No rows found"
+            // console.warn('Team member check error', error);
+        }
+
+        if (teamMember) {
+            return {
+                role: teamMember.role,
+                permissions: ROLE_PERMISSIONS[teamMember.role] || [],
+                brand,
+                teamMemberId: teamMember.id,
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error('getBrandAccessInfo error:', error);
         return null;
     }
-
-    // Check if owner
-    if (brand.userId.toString() === userId) {
-        return {
-            role: 'owner',
-            permissions: ROLE_PERMISSIONS.owner,
-            brand,
-        };
-    }
-
-    // Check if team member
-    const teamMember = await checkBrandAccess(brandId, userId);
-
-    if (teamMember) {
-        return {
-            role: teamMember.role,
-            permissions: ROLE_PERMISSIONS[teamMember.role] || [],
-            brand,
-            teamMemberId: teamMember._id,
-        };
-    }
-
-    return null;
 }
 
 /**

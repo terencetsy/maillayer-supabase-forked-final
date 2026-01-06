@@ -1,6 +1,4 @@
-import crypto from 'crypto';
-import connectToDatabase from '@/lib/mongodb';
-import User from '@/models/User';
+import { supabaseAdmin } from '@/lib/supabase';
 import config from '@/lib/config';
 
 export default async function handler(req, res) {
@@ -15,33 +13,34 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
-        // Find the user
-        const user = await User.findOne({ email });
+        // Generate password reset link using Supabase Admin
+        // This generates a link like: https://your-project.supabase.co/auth/v1/verify?token=...&type=recovery&redirect_to=...
+        // We can specify a redirect URL to our frontend's reset password page.
+        const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'recovery',
+            email,
+            options: {
+                redirectTo: `${config.baseUrl}/reset-password`,
+            },
+        });
 
         // We don't want to reveal if a user exists or not for security reasons
-        // So we'll always return a success message whether the user exists or not
-        if (!user) {
+        // Supabase returns an error if user not found, but we should mask it or handle it.
+        // Actually Supabase 'generateLink' might error if user doesn't exist.
+
+        if (error) {
+            // Log error internally
+            console.warn('Supabase generateLink warning:', error);
+            // Return success message to avoid user enumeration
             return res.status(200).json({
                 message: 'If your email exists in our system, you will receive password reset instructions shortly.',
             });
         }
 
-        // Generate a reset token
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
+        const { action_link } = data.properties;
 
-        // Update user with reset token
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = resetTokenExpiry;
-        await user.save();
-
-        // Create reset URL
-        const resetUrl = `${config.baseUrl}/reset-password?token=${resetToken}`;
-
-        // Call your custom email API
+        // Call your custom email API with the Supabase action link
+        // Replacing the previous 'resetUrl' with 'action_link'
         const emailResponse = await fetch(`https://api.maillayer.com/v1/transactional/76YyfHiWVBUwG4qR`, {
             method: 'POST',
             headers: {
@@ -49,19 +48,14 @@ export default async function handler(req, res) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                email: user.email,
+                email: email,
                 dataVariables: {
-                    resetUrl,
+                    resetUrl: action_link, // Pass the Supabase recovery link
                 },
             }),
         });
 
         if (!emailResponse.ok) {
-            // If email sending fails, remove the token
-            user.resetPasswordToken = undefined;
-            user.resetPasswordExpires = undefined;
-            await user.save();
-
             throw new Error('Failed to send password reset email');
         }
 

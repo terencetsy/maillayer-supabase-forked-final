@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signIn } from 'next-auth/react';
+import { authHelpers } from '@/lib/auth';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -52,45 +52,38 @@ export default function Signup() {
         setError('');
 
         try {
-            const res = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    name,
-                    email,
-                    password,
-                }),
-            });
+            // Using Supabase auth helper directly on client
+            const { data, error: signUpError } = await authHelpers.signUp(email, password, name);
 
-            if (!res.ok) {
-                let errorMessage = 'Something went wrong';
-                try {
-                    const data = await res.json();
-                    errorMessage = data.message || errorMessage;
-                } catch (e) {
-                    // If JSON parse fails, try text or use status text
-                    const text = await res.text();
-                    errorMessage = text || `Server error: ${res.status} ${res.statusText}`;
-                    console.error('Non-JSON error response:', text);
+            if (signUpError) {
+                throw new Error(signUpError.message);
+            }
+
+            // Auto sign in after signup (Supabase usually signs in automatically, but good to ensure)
+            // If email confirmation is enabled, this might behave differently (user won't be signed in yet).
+            // Assuming email confirmation is OFF or handled gracefully.
+
+            // If the user isn't signed in from signUp (e.g. email confirmation required), 
+            // we should show a message. But if it returns user, we can try signIn.
+
+            if (data?.user) {
+                const { error: signInError } = await authHelpers.signIn(email, password);
+                if (signInError) throw signInError;
+
+                router.push('/brands');
+            } else {
+                // Check if session exists (sometimes signUp returns session)
+                const { data: { session } } = await authHelpers.getUser(); // or just check auth state
+                if (session) {
+                    router.push('/brands');
+                } else {
+                    // Email confirmation case
+                    setError('Please check your email to confirm your account.');
+                    setIsLoading(false);
+                    return;
                 }
-                throw new Error(errorMessage);
             }
 
-            const result = await signIn('credentials', {
-                redirect: false,
-                email,
-                password,
-            });
-
-            if (result.error) {
-                setError(result.error);
-                setIsLoading(false);
-                return;
-            }
-
-            router.push('/brands');
         } catch (error) {
             console.error('Signup error:', error);
             setError(error.message || 'An unexpected error occurred');

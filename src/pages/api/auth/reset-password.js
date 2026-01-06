@@ -1,44 +1,14 @@
-import connectToDatabase from '@/lib/mongodb';
-import User from '@/models/User';
-
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
     }
 
-    try {
-        const { token, password } = req.body;
+    // This endpoint is deprecated as Supabase handles password updates via client-side Auth SDK
+    // or via the recovery link flow which redirects to the frontend.
+    // The frontend should handle the 'recovery' event and prompt for a new password,
+    // then call supabase.auth.updateUser({ password: newPassword }).
 
-        if (!token || !password) {
-            return res.status(400).json({ message: 'Token and password are required' });
-        }
-
-        if (password.length < 8) {
-            return res.status(400).json({ message: 'Password must be at least 8 characters' });
-        }
-
-        // Connect to database
-        await connectToDatabase();
-
-        // Find a user with this token and where the token hasn't expired
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() },
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired token' });
-        }
-
-        // Update the user's password
-        user.password = password; // The UserSchema pre-save hook will hash this
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-        await user.save();
-
-        return res.status(200).json({ message: 'Password has been reset successfully' });
-    } catch (error) {
-        console.error('Reset password error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
-    }
+    return res.status(410).json({
+        message: 'This endpoint is deprecated. Please use the Supabase client-side password update flow.'
+    });
 }
