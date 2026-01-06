@@ -14,7 +14,11 @@ export async function middleware(req) {
     // Helper to check for admin existence via API
     const checkAdminExists = async () => {
         try {
-            const res = await fetch(`${req.nextUrl.origin}/api/auth/check-admin`);
+            const url = req.nextUrl.clone();
+            url.pathname = '/api/auth/check-admin';
+            url.search = ''; // Clear query params
+
+            const res = await fetch(url);
             if (!res.ok) return false;
             const data = await res.json();
             return !!data.adminExists;
