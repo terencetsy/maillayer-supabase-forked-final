@@ -1,7 +1,4 @@
-// src/pages/api/brands/[brandId]/transactional/[templateId]/publish.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getTemplateById, updateTemplate } from '@/services/transactionalService';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,44 +11,42 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
+        const { user } = await getUserFromRequest(req);
 
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, templateId } = req.query;
 
         if (!brandId || !templateId) {
             return res.status(400).json({ message: 'Missing required parameters' });
         }
 
-        // Check if the brand belongs to the user
         const brand = await getBrandById(brandId);
         if (!brand) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        // Check permission - publishing is an edit operation
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_TRANSACTIONAL);
         if (!authCheck.authorized) {
             return res.status(authCheck.status).json({ message: authCheck.message });
         }
 
-        // Check if brand is ready to send emails
-        if (brand.status !== 'active') {
+        if (brand.status !== 'active') { // Assume 'status' column exists and verified brands are 'active'
+            // Or verify email sending capability
             return res.status(400).json({ message: 'Brand is not verified for sending emails' });
         }
 
-        // Get the template
-        const template = await getTemplateById(templateId, brandId);
+        const template = await getTemplateById(templateId);
         if (!template) {
             return res.status(404).json({ message: 'Template not found' });
+        }
+
+        // Brand ownership check
+        if ((template.brand_id || template.brandId) !== brandId) {
+            return res.status(403).json({ message: 'Mismatch' });
         }
 
         if (template.status === 'published') {
@@ -59,13 +54,13 @@ export default async function handler(req, res) {
         }
 
         // Generate API key if not already present
-        const apiKey = template.apiKey || `trx_${uuidv4().replace(/-/g, '')}`;
+        // snake_case column `api_key`
+        const apiKey = template.api_key || `trx_${uuidv4().replace(/-/g, '')}`;
 
-        // Update the template status and API key
         const updateData = {
             status: 'published',
-            apiKey,
-            publishedAt: new Date(),
+            api_key: apiKey,
+            published_at: new Date(),
         };
 
         const success = await updateTemplate(templateId, brandId, updateData);
@@ -74,8 +69,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ message: 'Failed to publish template' });
         }
 
-        // Fetch the updated template to return
-        const updatedTemplate = await getTemplateById(templateId, brandId);
+        const updatedTemplate = await getTemplateById(templateId);
 
         res.status(200).json({
             message: 'Template published successfully',

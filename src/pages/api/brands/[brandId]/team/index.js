@@ -1,29 +1,43 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { createTeamMemberInvite, getTeamMembersByBrandId } from '@/services/teamMemberService';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 import config from '@/lib/config';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session?.user) {
+        const { user } = await getUserFromRequest(req);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
 
-        // Get brand and verify ownership (only owner can manage team)
+        // Get brand and verify ownership (or use checkBrandPermission with MANAGE_TEAM permission)
+        // Original code enforced: brand.userId === userId.
+        // We can use checkBrandPermission if we have a MANAGE_TEAM role, usually Admin/Owner.
+        // Let's stick to brand ownership or 'admin' check. 
+        // getBrandById returns snake_case or camel? service returns it.
+
         const brand = await getBrandById(brandId);
         if (!brand) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        if (brand.userId.toString() !== userId) {
+        // Only owner can manage team strictly? Or admins?
+        // Original: `brand.userId.toString() !== userId`
+        // Supabase `brand.user_id` or `brand.userId`. 
+        // service `getBrandById` uses `brandsDb` which returns `user_id`.
+        // But `brandService` might not map it? 
+        // I viewed `brandService.js` in step 955. It returns result of `brandsDb.getById`.
+        // `brandsDb.getById` returns raw row -> `user_id`.
+        // So we must use `user_id`.
+
+        const isOwner = (brand.user_id || brand.userId) === userId;
+        if (!isOwner) {
+            // Also allow if user is a team member with high privilege? 
+            // Original code was strict: `brand.userId.toString() !== userId`
             return res.status(403).json({ message: 'Only brand owner can manage team' });
         }
 
@@ -46,7 +60,7 @@ export default async function handler(req, res) {
             }
 
             // Check if email is brand owner
-            if (email.toLowerCase() === session.user.email.toLowerCase()) {
+            if (email.toLowerCase() === user.email.toLowerCase()) {
                 return res.status(400).json({ message: 'Cannot invite yourself' });
             }
 
@@ -63,16 +77,22 @@ export default async function handler(req, res) {
 
                 return res.status(201).json({
                     teamMember: {
-                        _id: teamMember._id,
+                        id: teamMember.id,
                         email: teamMember.email,
                         role: teamMember.role,
                         status: teamMember.status,
-                        invitedAt: teamMember.invitedAt,
+                        invitedAt: teamMember.created_at, // or invited_at
                     },
                     inviteUrl,
                 });
             } catch (error) {
-                if (error.code === 11000) {
+                if (error.message && error.message.includes('already')) {
+                    return res.status(400).json({
+                        message: error.message,
+                    });
+                }
+                // Supabase constraint?
+                if (error.code === '23505') { // Unique violation
                     return res.status(400).json({
                         message: 'This email has already been invited to this brand',
                     });

@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import formidable from 'formidable';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import fs from 'fs';
@@ -30,9 +29,9 @@ const s3Client = new S3Client({
 
 export default async function handler(req, res) {
     // Check authentication
-    const session = await getServerSession(req, res, authOptions);
-    if (!session || !session.user) {
-        return res.status(401).json({ message: 'Unauthorized' });
+    const { user } = await getUserFromRequest(req, res);
+    if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Only allow POST requests

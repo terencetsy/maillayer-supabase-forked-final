@@ -1,6 +1,4 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../../auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getTeamMemberById, regenerateInviteToken } from '@/services/teamMemberService';
 import config from '@/lib/config';
@@ -11,25 +9,25 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session?.user) {
+        const { user } = await getUserFromRequest(req);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, memberId } = req.query;
 
         // Verify brand ownership
         const brand = await getBrandById(brandId);
-        if (!brand || brand.userId.toString() !== userId) {
+        const isOwner = (brand.user_id || brand.userId) === userId;
+
+        if (!brand || !isOwner) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
         // Verify team member
         const teamMember = await getTeamMemberById(memberId);
-        if (!teamMember || teamMember.brandId.toString() !== brandId) {
+        if (!teamMember || (teamMember.brand_id || teamMember.brandId) !== brandId) {
             return res.status(404).json({ message: 'Team member not found' });
         }
 

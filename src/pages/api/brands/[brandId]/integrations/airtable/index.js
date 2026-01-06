@@ -1,6 +1,5 @@
 // src/pages/api/brands/[id]/integrations/airtable.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { createIntegration, getIntegrationByType, updateIntegration } from '@/services/integrationService';
 
 export default async function handler(req, res) {
@@ -10,13 +9,13 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
         try {
             // Authenticate the user
-            const session = await getServerSession(req, res, authOptions);
-            if (!session) {
+            const { user } = await getUserFromRequest(req, res);
+            if (!user) {
                 return res.status(401).json({ message: 'Unauthorized' });
             }
 
             // Fetch the integration
-            const integration = await getIntegrationByType('airtable', brandId, session.user.id);
+            const integration = await getIntegrationByType('airtable', brandId, user.id);
 
             // If integration exists, return it
             if (integration) {
@@ -35,8 +34,8 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         try {
             // Authenticate the user
-            const session = await getServerSession(req, res, authOptions);
-            if (!session) {
+            const { user } = await getUserFromRequest(req, res);
+            if (!user) {
                 return res.status(401).json({ message: 'Unauthorized' });
             }
 
@@ -56,7 +55,7 @@ export default async function handler(req, res) {
             console.log('Updating integration with tableSyncs:', JSON.stringify(updatedTableSyncs));
 
             // Check if integration already exists
-            const existingIntegration = await getIntegrationByType('airtable', brandId, session.user.id);
+            const existingIntegration = await getIntegrationByType('airtable', brandId, user.id);
 
             if (existingIntegration) {
                 // Update existing integration with explicit config structure
@@ -65,7 +64,7 @@ export default async function handler(req, res) {
                     tableSyncs: updatedTableSyncs,
                 };
 
-                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, session.user.id, {
+                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, user.id, {
                     name,
                     config: updatedConfig,
                     status: 'active',
@@ -82,7 +81,7 @@ export default async function handler(req, res) {
                 const newIntegration = await createIntegration({
                     name,
                     type: 'airtable',
-                    userId: session.user.id,
+                    userId: user.id,
                     brandId,
                     config,
                     status: 'active',

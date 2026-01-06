@@ -15,7 +15,7 @@ const config = {
     nextAuthUrl: BASE_URL,
 
     // MongoDB connection
-    mongodbUri: process.env.MONGODB_URI,
+
 
     // Redis configuration - use ONLY the URL
     redisURL: REDIS_URL,

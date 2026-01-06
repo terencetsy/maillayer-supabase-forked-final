@@ -1,22 +1,17 @@
-// src/pages/api/brands/[brandId]/email-sequences/[sequenceId]/enrollments.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getSequenceEnrollments } from '@/services/emailSequenceService';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
+        const { user } = await getUserFromRequest(req); // uses Supabase
 
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, sequenceId } = req.query;
 
         if (!brandId || !sequenceId) {
@@ -28,7 +23,6 @@ export default async function handler(req, res) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        // Check permission - enrollments is a view operation for sequences
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.VIEW_SEQUENCES);
         if (!authCheck.authorized) {
             return res.status(authCheck.status).json({ message: authCheck.message });

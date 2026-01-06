@@ -1,70 +1,60 @@
 // src/lib/queue.js
-// Queue initialization for Next.js API routes (ES Modules)
+import { kvQueue } from './kv-queue';
 
-// Get Redis URL
-function getRedisUrl() {
-    return process.env.REDIS_URL || 'redis://localhost:6379';
-}
+// Adapter to mimic Bull-like interface partially or just export helpers
+// The original file exported `initializeQueues` which returned { emailCampaignQueue, schedulerQueue }.
+// We should maintain this interface to minimize breakage in consumers (if any API routes use it).
+// But consumers called `queue.add()`. Our `kvQueue.add` signature is compatible enough (queueName, data, options).
 
-// Cache for queue instances
+const createQueueWrapper = (queueName) => ({
+    add: async (name, data, options) => {
+        // Bull: queue.add(name, data, options) OR queue.add(data, options)
+        // Check if name is string.
+        let jobData = data;
+        let jobOptions = options;
+        let jobName = name;
+
+        if (typeof name !== 'string') {
+            jobOptions = data;
+            jobData = name;
+            jobName = 'default';
+        }
+
+        return await kvQueue.add(queueName, { ...jobData, _jobName: jobName }, jobOptions);
+    },
+    process: () => {
+        console.warn(`[Queue ${queueName}] .process() called but queues are now serverless. Use Cron API instead.`);
+    },
+    on: () => { } // stub
+});
+
 let queueInstance = null;
 
-// Initialize queues (lazy loading)
 async function initializeQueues() {
-    if (queueInstance) {
-        return queueInstance;
-    }
+    if (queueInstance) return queueInstance;
 
-    try {
-        // Dynamic imports for ES Module environment
-        const Bull = (await import('bull')).default;
-        const Redis = (await import('ioredis')).default;
+    const emailCampaignQueue = createQueueWrapper('email-campaigns');
+    const schedulerQueue = createQueueWrapper('campaign-scheduler');
 
-        const redisUrl = getRedisUrl();
+    // Add others for workers we found
+    const emailSequenceQueue = createQueueWrapper('email-sequences');
+    const firebaseSyncQueue = createQueueWrapper('firebase-auth-sync');
+    const supabaseSyncQueue = createQueueWrapper('supabase-sync');
+    const sheetsSyncQueue = createQueueWrapper('google-sheets-sync');
+    const airtableSyncQueue = createQueueWrapper('airtable-sync');
 
-        // Create Redis clients for Bull with proper error handling
-        const createRedisClient = () => {
-            const redisClient = new Redis(redisUrl, {
-                enableReadyCheck: false,
-                maxRetriesPerRequest: null,
-            });
+    queueInstance = {
+        emailCampaignQueue,
+        schedulerQueue,
+        emailSequenceQueue,
+        firebaseSyncQueue,
+        supabaseSyncQueue,
+        sheetsSyncQueue,
+        airtableSyncQueue
+    };
 
-            redisClient.on('error', (err) => {
-                console.error('Redis client error:', err.message);
-            });
-
-            return redisClient;
-        };
-
-        // Create queues
-        const emailCampaignQueue = new Bull('email-campaigns', {
-            createClient: () => createRedisClient(),
-            defaultJobOptions: {
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 5000,
-                },
-                removeOnComplete: 100,
-                removeOnFail: 100,
-            },
-        });
-
-        const schedulerQueue = new Bull('campaign-scheduler', {
-            createClient: () => createRedisClient(),
-            defaultJobOptions: {
-                removeOnComplete: true,
-            },
-        });
-
-        queueInstance = { emailCampaignQueue, schedulerQueue };
-        return queueInstance;
-    } catch (error) {
-        console.error('Error initializing queues:', error);
-        throw error;
-    }
+    return queueInstance;
 }
 
-// Export the async initializer function
 export default initializeQueues;
-export { initializeQueues, getRedisUrl };
+export { initializeQueues };

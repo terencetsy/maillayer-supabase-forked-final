@@ -1,11 +1,8 @@
-// src/pages/api/brands/[brandId]/email-sequences/[sequenceId]/logs.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
-import { getEmailSequenceById } from '@/services/emailSequenceService';
-import { getSequenceLogs } from '@/services/sequenceLogService';
+import { getSequenceLogs } from '@/services/sequenceLogService'; // Updated service
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
+import { getEmailSequenceById } from '@/services/emailSequenceService';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -13,14 +10,12 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, sequenceId } = req.query;
 
         if (!brandId || !sequenceId) {
@@ -33,13 +28,12 @@ export default async function handler(req, res) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        // Check permission - viewing logs is a view operation for sequences
+        // Check permission
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.VIEW_SEQUENCES);
         if (!authCheck.authorized) {
             return res.status(authCheck.status).json({ message: authCheck.message });
         }
 
-        // Parse pagination and filter parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 50;
         const email = req.query.email || '';
@@ -47,14 +41,15 @@ export default async function handler(req, res) {
         const startDate = req.query.startDate || null;
         const endDate = req.query.endDate || null;
 
-        // Get the sequence - filter by brandId only
+        // Get the sequence
         const sequence = await getEmailSequenceById(sequenceId, brandId);
-
         if (!sequence) {
             return res.status(404).json({ message: 'Sequence not found' });
         }
 
-        // Get logs
+        // Get logs using refactored service
+        // Need to check if `getSequenceLogs` expects snake_case opts or not. 
+        // Service likely adapts.
         const result = await getSequenceLogs(sequenceId, {
             page,
             limit,

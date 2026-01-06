@@ -1,19 +1,15 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getTeamMemberById, updateTeamMemberRole, revokeTeamMember } from '@/services/teamMemberService';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session?.user) {
+        const { user } = await getUserFromRequest(req);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, memberId } = req.query;
 
         // Get brand and verify ownership
@@ -22,13 +18,15 @@ export default async function handler(req, res) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        if (brand.userId.toString() !== userId) {
+        const isOwner = (brand.user_id || brand.userId) === userId;
+        if (!isOwner) {
             return res.status(403).json({ message: 'Only brand owner can manage team' });
         }
 
         // Verify team member belongs to this brand
         const teamMember = await getTeamMemberById(memberId);
-        if (!teamMember || teamMember.brandId.toString() !== brandId) {
+        // Supabase returns snake_case `brand_id`.
+        if (!teamMember || (teamMember.brand_id || teamMember.brandId) !== brandId) {
             return res.status(404).json({ message: 'Team member not found' });
         }
 
