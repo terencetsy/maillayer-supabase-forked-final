@@ -1,6 +1,4 @@
-import { hasAdminUser } from '@/services/userService';
-import User from '@/models/User';
-import connectToDatabase from '@/lib/mongodb';
+import { authHelpers } from '@/lib/auth';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -8,49 +6,27 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Connect to database
-        await connectToDatabase();
-
         const { name, email, password } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        // Check if admin exists already
-        const adminExists = await hasAdminUser();
+        // Use authHelpers to sign up
+        // Note: The helper logic handles profile creation and role assignment
+        const { data, error } = await authHelpers.signUp(email, password, name);
 
-        if (adminExists) {
-            return res.status(403).json({ message: 'Signup is disabled as admin already exists' });
+        if (error) {
+            console.error('Signup error:', error);
+            return res.status(400).json({ message: error.message });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User with this email already exists' });
-        }
-
-        // Create user - let the model&apos; pre-save hook handle password hashing
-        try {
-            const user = new User({
-                name,
-                email,
-                password, // The UserSchema pre-save hook will hash this
-                role: 'admin', // First user is admin
-            });
-
-            await user.save();
-
-            return res.status(201).json({
-                message: 'User created successfully',
-                userId: user._id,
-            });
-        } catch (error) {
-            console.error('Error saving user:', error);
-            return res.status(500).json({ message: 'Error creating user: ' + error.message });
-        }
+        return res.status(201).json({
+            message: 'User created successfully',
+            user: data.user
+        });
     } catch (error) {
-        console.error('Signup error:', error);
+        console.error('Signup server error:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }

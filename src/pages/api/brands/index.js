@@ -1,83 +1,47 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { createBrand, getBrandsByUserId } from '@/services/brandService';
-import { getBrandsAsTeamMember } from '@/services/teamMemberService';
+import { requireAuth } from '@/lib/auth';
+import { brandsDb } from '@/lib/db/brands';
 
-export default async function handler(req, res) {
+export default requireAuth(async (req, res) => {
+    const { user } = req;
+    const userId = user.id;
+
     try {
-        // Connect to database
-        await connectToDatabase();
-
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
-
-        const userId = session.user.id;
-
-        // GET request - fetch brands (owned + team member access)
+        // GET request - fetch brands
         if (req.method === 'GET') {
-            try {
-                const [ownedBrands, teamBrands] = await Promise.all([
-                    getBrandsByUserId(userId),
-                    getBrandsAsTeamMember(userId),
-                ]);
+            const brands = await brandsDb.getByUserId(userId);
 
-                // Mark owned brands with userRole
-                const brandsWithRole = ownedBrands.map((b) => ({
-                    ...b,
-                    userRole: 'owner',
-                }));
+            // Transform to match expected frontend structure if needed
+            // For now returning direct DB result
+            // Note: Team brands logic to be added later
+            const brandsWithRole = brands.map(b => ({
+                ...b,
+                userRole: 'owner'
+            }));
 
-                // Add team brands with their role
-                teamBrands.forEach((tm) => {
-                    if (tm.brandId) {
-                        brandsWithRole.push({
-                            ...tm.brandId,
-                            userRole: tm.role,
-                            teamMemberId: tm._id,
-                        });
-                    }
-                });
-
-                return res.status(200).json(brandsWithRole);
-            } catch (error) {
-                console.error('Error fetching brands:', error);
-                return res.status(500).json({ message: 'Error fetching brands' });
-            }
+            return res.status(200).json(brandsWithRole);
         }
 
         // POST request - create new brand
         if (req.method === 'POST') {
-            try {
-                const { name, website } = req.body;
+            const { name, website } = req.body;
 
-                if (!name || !website) {
-                    return res.status(400).json({ message: 'Missing required fields' });
-                }
-
-                const brandData = {
-                    name,
-                    website,
-                    userId,
-                    status: 'pending_setup',
-                };
-
-                const newBrand = await createBrand(brandData);
-
-                return res.status(201).json(newBrand);
-            } catch (error) {
-                console.error('Error creating brand:', error);
-                return res.status(500).json({ message: 'Error creating brand' });
+            if (!name || !website) {
+                return res.status(400).json({ message: 'Missing required fields' });
             }
+
+            const brandData = {
+                name,
+                website,
+                status: 'pending_setup'
+            };
+
+            const newBrand = await brandsDb.create(userId, brandData);
+            return res.status(201).json(newBrand);
         }
 
         return res.status(405).json({ message: 'Method not allowed' });
     } catch (error) {
-        console.error('Server error:', error);
+        console.error('Brands API error:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
-}
+});

@@ -23,7 +23,7 @@ Last Updated: January 6, 2026 | Created by: Comet AI Assistant
 - [ ] 5. Set environment variables
 
 ### Phase 2: Migration
-- [ ] 6. Migrate API routes
+- [/] 6. Migrate API routes
 - [ ] 7. Update auth pages
 - [ ] 8. Replace Mongoose imports
 - [ ] 9. Test features

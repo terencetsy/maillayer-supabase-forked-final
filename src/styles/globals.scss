@@ -24,6 +24,13 @@ $dark-300: #525252;
 $dark-200: #737373;
 $dark-100: #a3a3a3;
 
+// Light Mode Variables
+$white: #ffffff;
+$light-bg: #fafafa;
+$light-100: #f5f5f5;
+$light-300: #e0e0e0;
+$light-900: #212121;
+
 // Text colors
 $text-primary: #fafafa;
 $text-secondary: #a1a1aa;
@@ -76,9 +83,15 @@ body {
     font-family: $font;
     font-size: 16px;
     line-height: 1.6;
-    color: $text-secondary;
-    background: $black;
+    color: $light-900;
+    background: $light-bg;
     min-height: 100vh;
+}
+
+// Update surfaces
+.card, .modal, .sidebar {
+  background: $white;
+  color: $light-900;
 }
 
 a {
