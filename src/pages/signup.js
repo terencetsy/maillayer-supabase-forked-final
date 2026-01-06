@@ -65,8 +65,17 @@ export default function Signup() {
             });
 
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || 'Something went wrong');
+                let errorMessage = 'Something went wrong';
+                try {
+                    const data = await res.json();
+                    errorMessage = data.message || errorMessage;
+                } catch (e) {
+                    // If JSON parse fails, try text or use status text
+                    const text = await res.text();
+                    errorMessage = text || `Server error: ${res.status} ${res.statusText}`;
+                    console.error('Non-JSON error response:', text);
+                }
+                throw new Error(errorMessage);
             }
 
             const result = await signIn('credentials', {
