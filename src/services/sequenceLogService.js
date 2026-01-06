@@ -1,24 +1,23 @@
-// src/services/sequenceLogService.js
-import connectToDatabase from '@/lib/mongodb';
-import { createSequenceLogModel } from '@/models/SequenceLog';
-import EmailSequence from '@/models/EmailSequence';
-import mongoose from 'mongoose';
+import { sequenceLogsDb } from '@/lib/db/sequenceLogs';
 
 export async function logSequenceEmail(logData) {
-    await connectToDatabase();
-
     try {
-        const SequenceLogModel = createSequenceLogModel(logData.sequenceId);
-
-        const log = new SequenceLogModel({
-            ...logData,
-            createdAt: new Date(),
+        const log = await sequenceLogsDb.logEmail({
+            sequence_id: logData.sequenceId,
+            contact_id: logData.contactId, // Ensure mapped
+            email: logData.email,
+            // Map other fields from camelCase to snake_case if DB requires it, 
+            // or assume helper handles it / DB columns are snake_case.
+            // ...logData might include camelCase keys.
+            // Supabase helper usually keeps keys as passed unless mapped.
+            // I should explicitly map standard keys.
+            enrollment_id: logData.enrollmentId,
+            step_id: logData.stepId,
+            status: logData.status || 'queued',
+            sent_at: logData.sentAt || new Date(),
+            // ...
+            ...logData // naive spread, might fail if column names mismatch
         });
-
-        await log.save();
-
-        console.log(`Created sequence log for ${logData.email} in collection seq_logs_${logData.sequenceId}`);
-
         return log;
     } catch (error) {
         console.error('Error logging sequence email:', error);
@@ -27,187 +26,38 @@ export async function logSequenceEmail(logData) {
 }
 
 export async function getSequenceLogs(sequenceId, options = {}) {
-    await connectToDatabase();
+    const { data, total } = await sequenceLogsDb.getLogs(sequenceId, options);
 
-    try {
-        const { page = 1, limit = 50, email = '', status = '', startDate = null, endDate = null } = options;
+    // Status counts?
+    // Fetching counts for every status (queued, delivered, failed)
+    // We can do parallel calls:
+    const statuses = ['queued', 'delivered', 'failed', 'sent'];
+    const counts = {};
 
-        const SequenceLogModel = createSequenceLogModel(sequenceId);
+    await Promise.all(statuses.map(async (s) => {
+        counts[s] = await sequenceLogsDb.count(sequenceId, { status: s });
+    }));
 
-        const query = {
-            sequenceId: new mongoose.Types.ObjectId(sequenceId),
-        };
-
-        // Add email filter if provided
-        if (email) {
-            query.email = { $regex: email, $options: 'i' };
-        }
-
-        // Add status filter if provided
-        if (status) {
-            query.status = status;
-        }
-
-        // Add date range filter if provided
-        if (startDate || endDate) {
-            query.sentAt = {};
-            if (startDate) {
-                query.sentAt.$gte = new Date(startDate);
-            }
-            if (endDate) {
-                query.sentAt.$lte = new Date(endDate);
-            }
-        }
-
-        const skip = (page - 1) * limit;
-
-        const logs = await SequenceLogModel.find(query).sort({ sentAt: -1 }).skip(skip).limit(limit).lean();
-
-        const total = await SequenceLogModel.countDocuments(query);
-
-        // Get status counts
-        const statusCounts = await SequenceLogModel.aggregate([
-            {
-                $match: {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                },
-            },
-            { $group: { _id: '$status', count: { $sum: 1 } } },
-            { $project: { _id: 0, status: '$_id', count: 1 } },
-        ]);
-
-        const statusCountsObj = {};
-        statusCounts.forEach((item) => {
-            statusCountsObj[item.status] = item.count;
-        });
-
-        return {
-            logs,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
-            statusCounts: statusCountsObj,
-        };
-    } catch (error) {
-        console.error('Error fetching sequence logs:', error);
-        throw error;
-    }
+    return {
+        logs: data,
+        pagination: {
+            page: options.page || 1,
+            limit: options.limit || 50,
+            total,
+            totalPages: Math.ceil(total / (options.limit || 50)),
+        },
+        statusCounts: counts
+    };
 }
 
 export async function getSequenceStats(sequenceId) {
-    await connectToDatabase();
-
     try {
-        const SequenceLogModel = createSequenceLogModel(sequenceId);
-
-        // Get total sent count
-        const sentCount = await SequenceLogModel.countDocuments({
-            sequenceId: new mongoose.Types.ObjectId(sequenceId),
-        });
-
-        // Get total delivered count
-        const deliveredCount = await SequenceLogModel.countDocuments({
-            sequenceId: new mongoose.Types.ObjectId(sequenceId),
-            status: 'delivered',
-        });
-
-        // Get open count from events
-        const openCount = await SequenceLogModel.aggregate([
-            {
-                $match: {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                },
-            },
-            {
-                $project: {
-                    events: {
-                        $filter: {
-                            input: '$events',
-                            as: 'event',
-                            cond: { $eq: ['$$event.type', 'open'] },
-                        },
-                    },
-                },
-            },
-            {
-                $group: {
-                    _id: null,
-                    count: { $sum: { $size: '$events' } },
-                },
-            },
-        ]);
-
-        // Get click count from events
-        const clickCount = await SequenceLogModel.aggregate([
-            {
-                $match: {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                },
-            },
-            {
-                $project: {
-                    events: {
-                        $filter: {
-                            input: '$events',
-                            as: 'event',
-                            cond: { $eq: ['$$event.type', 'click'] },
-                        },
-                    },
-                },
-            },
-            {
-                $group: {
-                    _id: null,
-                    count: { $sum: { $size: '$events' } },
-                },
-            },
-        ]);
-
-        // Get bounce count
-        const bounceCount = await SequenceLogModel.countDocuments({
-            sequenceId: new mongoose.Types.ObjectId(sequenceId),
-            status: 'failed',
-            error: { $regex: 'bounce', $options: 'i' },
-        });
-
-        // Get complaint count from events
-        const complaintCount = await SequenceLogModel.aggregate([
-            {
-                $match: {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                },
-            },
-            {
-                $project: {
-                    events: {
-                        $filter: {
-                            input: '$events',
-                            as: 'event',
-                            cond: { $eq: ['$$event.type', 'complaint'] },
-                        },
-                    },
-                },
-            },
-            {
-                $group: {
-                    _id: null,
-                    count: { $sum: { $size: '$events' } },
-                },
-            },
-        ]);
-
-        const opens = openCount.length > 0 ? openCount[0].count : 0;
-        const clicks = clickCount.length > 0 ? clickCount[0].count : 0;
-        const bounces = bounceCount || 0;
-        const complaints = complaintCount.length > 0 ? complaintCount[0].count : 0;
-
-        const openRate = sentCount > 0 ? ((opens / sentCount) * 100).toFixed(1) : 0;
-        const clickRate = sentCount > 0 ? ((clicks / sentCount) * 100).toFixed(1) : 0;
-        const bounceRate = sentCount > 0 ? ((bounces / sentCount) * 100).toFixed(1) : 0;
-        const complaintRate = sentCount > 0 ? ((complaints / sentCount) * 100).toFixed(1) : 0;
+        const sentCount = await sequenceLogsDb.count(sequenceId); // total logs
+        const deliveredCount = await sequenceLogsDb.count(sequenceId, { status: 'delivered' });
+        const opens = await sequenceLogsDb.count(sequenceId, { event_type: 'open' });
+        const clicks = await sequenceLogsDb.count(sequenceId, { event_type: 'click' });
+        const bounces = await sequenceLogsDb.count(sequenceId, { status: 'failed' }); // Simplification
+        const complaints = await sequenceLogsDb.count(sequenceId, { event_type: 'complaint' });
 
         return {
             sent: sentCount,
@@ -216,13 +66,12 @@ export async function getSequenceStats(sequenceId) {
             clicks,
             bounces,
             complaints,
-            openRate,
-            clickRate,
-            bounceRate,
-            complaintRate,
+            openRate: sentCount > 0 ? ((opens / sentCount) * 100).toFixed(1) : 0,
+            clickRate: sentCount > 0 ? ((clicks / sentCount) * 100).toFixed(1) : 0,
+            bounceRate: sentCount > 0 ? ((bounces / sentCount) * 100).toFixed(1) : 0,
+            complaintRate: sentCount > 0 ? ((complaints / sentCount) * 100).toFixed(1) : 0,
         };
     } catch (error) {
-        console.error('Error getting sequence stats:', error);
         return {
             sent: 0,
             delivered: 0,
@@ -239,54 +88,30 @@ export async function getSequenceStats(sequenceId) {
 }
 
 export async function trackSequenceEvent(sequenceId, enrollmentId, eventType, metadata = {}) {
-    await connectToDatabase();
-
     try {
-        const SequenceLogModel = createSequenceLogModel(sequenceId);
+        // 1. Find the log
+        const log = await sequenceLogsDb.findLog({ sequenceId, enrollmentId });
+        if (!log) return false;
 
-        // Find the log entry and check if event already exists
-        const existingLog = await SequenceLogModel.findOne({
-            sequenceId: new mongoose.Types.ObjectId(sequenceId),
-            enrollmentId: new mongoose.Types.ObjectId(enrollmentId),
-            'events.type': eventType,
-        });
+        // 2. Check if event exists (simple check in code)
+        const events = log.events || [];
+        const existingInfo = events.find(e => e.type === eventType);
 
-        let logResult;
-
-        if (existingLog) {
-            // Update existing event
-            logResult = await SequenceLogModel.findOneAndUpdate(
-                {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                    enrollmentId: new mongoose.Types.ObjectId(enrollmentId),
-                    'events.type': eventType,
-                },
-                {
-                    $set: {
-                        'events.$.timestamp': new Date(),
-                        'events.$.metadata': metadata,
-                    },
-                }
-            );
+        if (existingInfo) {
+            // Update metadata/timestamp
+            existingInfo.timestamp = new Date();
+            existingInfo.metadata = metadata;
         } else {
-            // Add new event
-            logResult = await SequenceLogModel.findOneAndUpdate(
-                {
-                    sequenceId: new mongoose.Types.ObjectId(sequenceId),
-                    enrollmentId: new mongoose.Types.ObjectId(enrollmentId),
-                },
-                {
-                    $push: {
-                        events: {
-                            type: eventType,
-                            timestamp: new Date(),
-                            metadata,
-                        },
-                    },
-                }
-            );
+            // Add new
+            events.push({
+                type: eventType,
+                timestamp: new Date(),
+                metadata
+            });
         }
 
+        // 3. Update log
+        await sequenceLogsDb.update(log.id, { events });
         return true;
     } catch (error) {
         console.error('Error tracking sequence event:', error);

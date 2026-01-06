@@ -1,6 +1,5 @@
-import connectToDatabase from '@/lib/mongodb';
 import { getTemplateByApiKey, logTransactionalEmail } from '@/services/transactionalService';
-import Brand from '@/models/Brand';
+import { supabaseAdmin } from '@/lib/supabase';
 import { generateTrackingToken } from '@/services/trackingService';
 import config from '@/lib/config';
 import crypto from 'crypto';
@@ -40,9 +39,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Connect to database
-        await connectToDatabase();
-
         const { apiKey, to, variables = {} } = req.body;
 
         if (!apiKey) {
@@ -53,7 +49,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Valid recipient email is required', success: false });
         }
 
-        // Get template by API key
+        // Get template by API key (uses transactionalDb -> supabaseAdmin)
         const template = await getTemplateByApiKey(apiKey);
         if (!template) {
             return res.status(404).json({ message: 'Invalid API key or template not found', success: false });
@@ -65,25 +61,53 @@ export default async function handler(req, res) {
         }
 
         // Get brand to retrieve email provider credentials
-        const brand = await Brand.findById(template.brandId).select('+awsSecretKey +sendgridApiKey +mailgunApiKey +smtpPassword');
+        // Use supabaseAdmin to bypass RLS as we are in a system process (authenticated by API key)
+        const { data: brand, error: brandError } = await supabaseAdmin
+            .from('brands')
+            .select('*') // Select all including secrets (RLS setup typically handles visibility, but Admin bypasses)
+            .eq('id', template.brand_id || template.brandId) // Handle snake_case or camelCase from DB
+            .single();
 
-        if (!brand) {
+        if (brandError || !brand) {
+            console.error('Brand fetch error:', brandError);
             return res.status(404).json({ message: 'Brand not found', success: false });
         }
 
         // Check if email provider credentials are configured
-        const provider = brand.emailProvider || 'ses';
-        if (provider === 'ses' && (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey)) {
+        // Note: Supabase columns are usually snake_case. 
+        // Need to check if `brands` table uses camelCase or snake_case columns.
+        // Assuming snake_case based on general Supabase conventions.
+        // Map snake_case to camelCase for the logic below if needed, or update logic.
+        // Given previous code used Mongoose `Brand` model which had `awsSecretKey`, migration might have preserved names OR created snake_case.
+        // Standard Supabase migrations use snake_case.
+        // Let's assume snake_case: `aws_region`, `aws_access_key`, `aws_secret_key`, `sendgrid_api_key`, `email_provider`.
+
+        const provider = brand.email_provider || brand.emailProvider || 'ses';
+        const brandData = {
+            ...brand,
+            awsRegion: brand.aws_region || brand.awsRegion,
+            awsAccessKey: brand.aws_access_key || brand.awsAccessKey,
+            awsSecretKey: brand.aws_secret_key || brand.awsSecretKey,
+            sendgridApiKey: brand.sendgrid_api_key || brand.sendgridApiKey,
+            mailgunApiKey: brand.mailgun_api_key || brand.mailgunApiKey,
+            mailgunDomain: brand.mailgun_domain || brand.mailgunDomain,
+            smtpPassword: brand.smtp_password || brand.smtpPassword,
+            fromName: brand.from_name || brand.fromName,
+            fromEmail: brand.from_email || brand.fromEmail,
+            replyToEmail: brand.reply_to_email || brand.replyToEmail,
+        };
+
+        if (provider === 'ses' && (!brandData.awsRegion || !brandData.awsAccessKey || !brandData.awsSecretKey)) {
             return res.status(400).json({
                 message: 'AWS SES credentials not configured for this brand',
                 success: false,
             });
-        } else if (provider === 'sendgrid' && !brand.sendgridApiKey) {
+        } else if (provider === 'sendgrid' && !brandData.sendgridApiKey) {
             return res.status(400).json({
                 message: 'SendGrid API key not configured for this brand',
                 success: false,
             });
-        } else if (provider === 'mailgun' && (!brand.mailgunApiKey || !brand.mailgunDomain)) {
+        } else if (provider === 'mailgun' && (!brandData.mailgunApiKey || !brandData.mailgunDomain)) {
             return res.status(400).json({
                 message: 'Mailgun credentials not configured for this brand',
                 success: false,
@@ -127,40 +151,44 @@ export default async function handler(req, res) {
         });
 
         // Add tracking pixel if open tracking is enabled (default: true for backward compatibility)
-        if (template.trackingConfig?.trackOpens !== false) {
-            // Generate tracking token
-            const trackingToken = generateTrackingToken(
-                template._id.toString(),
-                'txn', // Use 'txn' as contactId for transactional emails
-                to
-            );
+        if (template.tracking_config?.track_opens !== false && template.trackingConfig?.trackOpens !== false) {
+            const trackingEnabled = template.tracking_config?.track_opens ?? template.trackingConfig?.trackOpens ?? true;
 
-            // Create a tracking pixel with proper URL encoding
-            const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${encodeURIComponent(trackingToken)}&templateId=${encodeURIComponent(template._id)}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
+            if (trackingEnabled) {
+                // Generate tracking token
+                const trackingToken = generateTrackingToken(
+                    template.id || template._id,
+                    'txn', // Use 'txn' as contactId for transactional emails
+                    to
+                );
 
-            // Add tracking pixel at the end of the content, right before the closing body tag if possible
-            if (content.includes('</body>')) {
-                content = content.replace('</body>', `${trackingPixel}</body>`);
-            } else {
-                content = content + trackingPixel;
+                // Create a tracking pixel with proper URL encoding
+                const trackingPixel = `<img src="${config.baseUrl}/api/tracking/transactional?token=${encodeURIComponent(trackingToken)}&templateId=${encodeURIComponent(template.id || template._id)}&email=${encodeURIComponent(to)}" width="1" height="1" alt="" style="display:none;" />`;
+
+                // Add tracking pixel at the end of the content, right before the closing body tag if possible
+                if (content.includes('</body>')) {
+                    content = content.replace('</body>', `${trackingPixel}</body>`);
+                } else {
+                    content = content + trackingPixel;
+                }
             }
         }
 
         // Create email provider using factory
         const ProviderFactory = await getProviderFactory();
         const brandWithDecryptedSecrets = {
-            ...brand.toObject(),
-            awsSecretKey: decryptData(brand.awsSecretKey, process.env.ENCRYPTION_KEY),
-            sendgridApiKey: decryptData(brand.sendgridApiKey, process.env.ENCRYPTION_KEY),
-            mailgunApiKey: decryptData(brand.mailgunApiKey, process.env.ENCRYPTION_KEY),
-            smtpPassword: decryptData(brand.smtpPassword, process.env.ENCRYPTION_KEY),
+            ...brandData,
+            awsSecretKey: decryptData(brandData.awsSecretKey, process.env.ENCRYPTION_KEY),
+            sendgridApiKey: decryptData(brandData.sendgridApiKey, process.env.ENCRYPTION_KEY),
+            mailgunApiKey: decryptData(brandData.mailgunApiKey, process.env.ENCRYPTION_KEY),
+            smtpPassword: decryptData(brandData.smtpPassword, process.env.ENCRYPTION_KEY),
         };
         const emailProvider = ProviderFactory.createProvider(brandWithDecryptedSecrets, { decryptSecrets: false });
 
         // Set up email parameters
-        const fromName = template.fromName || brand.fromName || brand.name;
-        const fromEmail = template.fromEmail || brand.fromEmail;
-        const replyTo = template.replyTo || brand.replyToEmail || fromEmail;
+        const fromName = template.from_name || template.fromName || brandData.fromName || brandData.name;
+        const fromEmail = template.from_email || template.fromEmail || brandData.fromEmail;
+        const replyTo = template.reply_to || template.replyTo || brandData.replyToEmail || fromEmail;
 
         // Send email using provider abstraction
         const sendResult = await emailProvider.send({
@@ -170,17 +198,21 @@ export default async function handler(req, res) {
             html: content,
             replyTo,
             tags: [
-                { name: 'templateId', value: template._id.toString() },
+                { name: 'templateId', value: (template.id || template._id).toString() },
                 { name: 'type', value: 'transactional' },
             ],
         });
 
         // Log the transactional email
         await logTransactionalEmail({
-            templateId: template._id,
-            brandId: template.brandId,
-            userId: template.userId,
+            template_id: template.id || template._id, // snake_case
+            templateId: template.id || template._id, // legacy support if needed
+            brand_id: template.brand_id || template.brandId,
+            brandId: template.brand_id || template.brandId,
+            user_id: template.user_id || template.userId,
+            userId: template.user_id || template.userId,
             to,
+            to_email: to, // Supabase column might be to_email
             subject,
             variables,
             status: 'sent',

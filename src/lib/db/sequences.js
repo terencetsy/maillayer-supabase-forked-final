@@ -55,5 +55,53 @@ export const sequencesDb = {
             .single()
         if (error) throw error
         return data
+    },
+
+    async update(sequenceId, updates) {
+        const { data, error } = await supabase
+            .from('email_sequences')
+            .update(updates)
+            .eq('id', sequenceId)
+            .select()
+            .single()
+        if (error) throw error
+        return data
+    },
+
+    async updateStep(stepId, updates) {
+        const { data, error } = await supabase
+            .from('sequence_steps')
+            .update(updates)
+            .eq('id', stepId)
+            .select()
+            .single()
+        if (error) throw error
+        return data
+    },
+
+    async deleteStep(stepId) {
+        const { error } = await supabase
+            .from('sequence_steps')
+            .delete()
+            .eq('id', stepId)
+        if (error) throw error
+    },
+
+    async getSteps(sequenceId) {
+        const { data, error } = await supabase
+            .from('sequence_steps')
+            .select('*')
+            .eq('sequence_id', sequenceId)
+            .order('order_index', { ascending: true })
+        if (error) throw error
+        return data
+    },
+
+    async delete(sequenceId) {
+        const { error } = await supabase
+            .from('email_sequences')
+            .delete()
+            .eq('id', sequenceId)
+        if (error) throw error
     }
 }

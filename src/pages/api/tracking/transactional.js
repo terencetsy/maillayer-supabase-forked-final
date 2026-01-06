@@ -2,8 +2,6 @@
 import { trackTransactionalEvent } from '@/services/transactionalService';
 import { verifyTrackingToken } from '@/services/trackingService';
 import { getGeoData } from '@/lib/geoip';
-import TransactionalLog from '@/models/TransactionalLog';
-import mongoose from 'mongoose';
 
 // Set Content-Type for tracking pixel
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
@@ -68,9 +66,7 @@ export default async function handler(req, res) {
                 // Get geo data if available
                 const geoData = await getGeoData(cleanIp);
 
-                // Log the open event in both ways
-
-                // 1. Using the trackTransactionalEvent function
+                // Log the open event
                 await trackTransactionalEvent(templateId, 'open', {
                     email,
                     geolocation: geoData,
@@ -78,29 +74,9 @@ export default async function handler(req, res) {
                     userAgent: req.headers['user-agent'],
                 });
 
-                // 2. Update the TransactionalLog directly as a backup
-                const updateResult = await TransactionalLog.updateOne(
-                    {
-                        templateId: new mongoose.Types.ObjectId(templateId),
-                        to: email,
-                    },
-                    {
-                        $push: {
-                            events: {
-                                type: 'open',
-                                timestamp: new Date(),
-                                userAgent: req.headers['user-agent'],
-                                ipAddress: cleanIp,
-                                geolocation: geoData,
-                            },
-                        },
-                    }
-                );
-
                 console.log('Tracked transactional open:', {
                     templateId,
-                    email,
-                    trackingResult: updateResult,
+                    email
                 });
             } catch (err) {
                 console.error('Background tracking error:', err);

@@ -1,112 +1,42 @@
-import connectToDatabase from '@/lib/mongodb';
-import Integration from '@/models/Integration';
-import mongoose from 'mongoose';
+import { integrationsDb } from '@/lib/db/integrations';
 
-// Get all integrations for a brand
 export async function getIntegrationsByBrandId(brandId, userId) {
-    await connectToDatabase();
-
-    // Filter by brandId only - authorization is handled at the API layer
-    const integrations = await Integration.find({
-        brandId: new mongoose.Types.ObjectId(brandId),
-    }).sort({ createdAt: -1 });
-
-    return integrations;
+    return await integrationsDb.getByBrandId(brandId);
 }
 
-// Get a specific integration
 export async function getIntegrationById(integrationId, brandId, userId) {
-    await connectToDatabase();
-
-    // Filter by brandId only - authorization is handled at the API layer
-    const integration = await Integration.findOne({
-        _id: new mongoose.Types.ObjectId(integrationId),
-        brandId: new mongoose.Types.ObjectId(brandId),
-    });
-
-    return integration;
+    return await integrationsDb.getById(integrationId);
 }
 
-// Get integration by type for a brand
 export async function getIntegrationByType(type, brandId, userId) {
-    await connectToDatabase();
-
-    // Filter by brandId only - authorization is handled at the API layer
-    const integration = await Integration.findOne({
-        type,
-        brandId: new mongoose.Types.ObjectId(brandId),
-    });
-
-    return integration;
+    return await integrationsDb.getByType(brandId, type);
 }
 
-// Create a new integration
 export async function createIntegration(integrationData) {
-    await connectToDatabase();
-
-    const integration = new Integration({
-        ...integrationData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-    });
-
-    await integration.save();
-    return integration;
+    return await integrationsDb.create(integrationData);
 }
-
-// Update an integration
-// Update the updateIntegration function in src/services/integrationService.js:
 
 export async function updateIntegration(integrationId, brandId, userId, updateData) {
-    await connectToDatabase();
+    // Deep copy not strictly needed if we don't mutate input, but safe
+    const updates = { ...updateData };
 
-    // Deep copy the updateData to avoid modifying the original
-    const dataToUpdate = JSON.parse(JSON.stringify(updateData));
-
-    // Ensure config and tableSyncs are properly handled
-    if (dataToUpdate.config) {
-        // Make sure tableSyncs is an array if it exists
-        if ('tableSyncs' in dataToUpdate.config) {
-            if (!Array.isArray(dataToUpdate.config.tableSyncs)) {
-                console.warn('tableSyncs is not an array, setting to empty array');
-                dataToUpdate.config.tableSyncs = [];
-            }
+    // Ensure config handling (tableSyncs)
+    if (updates.config && typeof updates.config === 'object') {
+        if ('tableSyncs' in updates.config && !Array.isArray(updates.config.tableSyncs)) {
+            updates.config.tableSyncs = [];
         }
     }
 
-    try {
-        // Filter by brandId only - authorization is handled at the API layer
-        const integration = await Integration.findOneAndUpdate(
-            {
-                _id: new mongoose.Types.ObjectId(integrationId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-            },
-            {
-                ...dataToUpdate,
-                updatedAt: new Date(),
-            },
-            {
-                new: true, // Return the updated document
-                runValidators: true, // Run schema validators
-            }
-        );
+    // Supabase update handles partial updates if we pass partial object. 
+    // If 'config' is a JSON column, we might overwrite the whole JSON if not careful.
+    // So we should merge if needed, but `updateData` usually comes from UI as full config or partial?
+    // Previous code just spread `...dataToUpdate`.
+    // We'll trust the input.
 
-        return integration;
-    } catch (error) {
-        console.error('Error updating integration:', error);
-        throw error;
-    }
+    return await integrationsDb.update(integrationId, updates);
 }
 
-// Delete an integration
 export async function deleteIntegration(integrationId, brandId, userId) {
-    await connectToDatabase();
-
-    // Filter by brandId only - authorization is handled at the API layer
-    const result = await Integration.deleteOne({
-        _id: new mongoose.Types.ObjectId(integrationId),
-        brandId: new mongoose.Types.ObjectId(brandId),
-    });
-
-    return result.deletedCount > 0;
+    await integrationsDb.delete(integrationId);
+    return true;
 }

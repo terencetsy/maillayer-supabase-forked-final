@@ -131,17 +131,62 @@ export async function parseTemplateVariables(content) {
     return variables;
 }
 
-export async function trackTransactionalEvent(templateId, eventType, metadata = {}) {
-    // Logic: Update template stats + Update log entry
-    // This requires:
-    // 1. Finding specific log entry (by email + templateId)
-    // 2. Updating its 'events' array
-    // 3. Incrementing template stats
+export async function trackTransactionalEvent(templateId, eventType, data = {}) {
+    const { email, ...metadata } = data;
 
-    // This is hard to do perfectly atomically without custom Postgres function.
-    // MVP: Fetch log, update array, save.
+    // Find the most recent log for this template and email
+    const { data: logs, total } = await transactionalDb.getLogs(templateId, {
+        email,
+        limit: 1
+    });
 
-    // ... Implementation logic similar to original but using Supabase read/write ...
+    if (!logs || logs.length === 0) {
+        console.warn('No transactional log found for event tracking:', { templateId, email, eventType });
+        return false;
+    }
 
-    return true; // Placeholder for now
+    const log = logs[0];
+    const events = log.events || [];
+
+    // Create new event object
+    const newEvent = {
+        type: eventType,
+        timestamp: new Date(),
+        ...metadata
+    };
+
+    // Append event
+    const updatedEvents = [...events, newEvent];
+
+    // Update log
+    // We update the log entry with new events.
+    // Also, we might want to update the status if it was 'sent' and now 'bounced'? 
+    // keeping status simple for now.
+    await transactionalDb.updateLog(log.id, {
+        events: updatedEvents,
+        updated_at: new Date()
+    });
+
+    // Increment template stats
+    try {
+        const template = await getTemplateById(templateId);
+        if (template) {
+            const stats = template.stats || {};
+            // Map event type to stat key
+            // eventType: 'open', 'click', 'bounce', 'complaint'
+            const statKey = eventType === 'open' ? 'opens' :
+                eventType === 'click' ? 'clicks' :
+                    eventType === 'bounce' ? 'bounces' :
+                        eventType === 'complaint' ? 'complaints' : null;
+
+            if (statKey) {
+                stats[statKey] = (stats[statKey] || 0) + 1;
+                await updateTemplate(templateId, template.brand_id || template.brandId, { stats });
+            }
+        }
+    } catch (err) {
+        console.error('Error updating template stats:', err);
+    }
+
+    return true;
 }

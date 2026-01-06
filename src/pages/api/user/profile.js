@@ -1,38 +1,48 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import User from '@/models/User';
-import mongoose from 'mongoose';
+import { getUserFromRequest, supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req, res) {
     try {
-        // Connect to database
-        await connectToDatabase();
+        // Authenticate using Supabase logic
+        const { user, error: authError } = await getUserFromRequest(req);
 
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
-            return res.status(401).json({ message: 'Unauthorized - No session' });
+        if (authError || !user) {
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        if (!session.user.id) {
-            console.error('Session user has no ID:', session.user);
-            return res.status(401).json({ message: 'Unauthorized - No user ID in session' });
-        }
-
-        const userId = session.user.id;
+        const userId = user.id;
 
         if (req.method === 'GET') {
             try {
-                // Find user by ID
-                const user = await User.findById(userId).select('-password');
+                // Get user metadata/profile
+                // If we have a public 'users' table, query it.
+                // Or just return user from auth (user object contains user_metadata)
 
-                if (!user) {
-                    return res.status(404).json({ message: 'User not found' });
-                }
+                // Assuming we might have extra data in a public table or we want to return standard profile
+                // For now, return what we have from Auth + metadata
 
-                return res.status(200).json(user);
+                // If we need to fetch from a public 'users' table:
+                /*
+                const { data: profile, error } = await supabaseAdmin
+                     .from('users')
+                     .select('*')
+                     .eq('id', userId)
+                     .single();
+                */
+
+                // Since we migrated, it's safer to rely on Auth User object for name/email
+                // and potentially a 'profiles' or 'users' table if it exists.
+                // But the Mongoose code returned `name` and `email`.
+
+                const responseData = {
+                    id: user.id,
+                    email: user.email,
+                    name: user.user_metadata?.name || '',
+                    role: user.user_metadata?.role || 'user', // Default role
+                    createdAt: user.created_at,
+                    // validUntil, etc if applicable
+                };
+
+                return res.status(200).json(responseData);
             } catch (error) {
                 console.error('Get profile error:', error);
                 return res.status(500).json({ message: 'Error retrieving user profile' });
@@ -47,25 +57,33 @@ export default async function handler(req, res) {
                     return res.status(400).json({ message: 'Missing required fields' });
                 }
 
-                // Update user
-                const updatedUser = await User.findByIdAndUpdate(
+                // Update Supabase Auth User
+                // Note: updating email sends confirmation email by default in Supabase.
+                const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
                     userId,
                     {
-                        name,
-                        email,
-                        updatedAt: new Date(),
-                    },
-                    { new: true }
-                ).select('-password');
+                        email: email,
+                        user_metadata: { name: name }
+                    }
+                );
 
-                if (!updatedUser) {
-                    return res.status(404).json({ message: 'User not found or not updated' });
+                if (updateError) {
+                    throw updateError;
                 }
 
-                return res.status(200).json(updatedUser);
+                // If we have a public users table, update it too
+                // await supabaseAdmin.from('users').update({ name, email }).eq('id', userId);
+
+                const u = updatedUser.user;
+                return res.status(200).json({
+                    id: u.id,
+                    email: u.email,
+                    name: u.user_metadata?.name,
+                    updatedAt: new Date() // approximate
+                });
             } catch (error) {
                 console.error('Update profile error:', error);
-                return res.status(500).json({ message: 'Error updating user profile' });
+                return res.status(500).json({ message: 'Error updating user profile', error: error.message });
             }
         }
 

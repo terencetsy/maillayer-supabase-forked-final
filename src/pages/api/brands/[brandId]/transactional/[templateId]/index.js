@@ -1,23 +1,17 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getTemplateById, updateTemplate, deleteTemplate, parseTemplateVariables } from '@/services/transactionalService';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     try {
-        // Connect to database
-        await connectToDatabase();
+        const { user } = await getUserFromRequest(req, res);
 
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, templateId } = req.query;
 
         if (!brandId || !templateId) {
@@ -69,11 +63,11 @@ export default async function handler(req, res) {
                 if (name) updateData.name = name;
                 if (subject) updateData.subject = subject;
                 if (content !== undefined) updateData.content = content;
-                if (fromName) updateData.fromName = fromName;
-                if (fromEmail) updateData.fromEmail = fromEmail;
-                if (replyTo) updateData.replyTo = replyTo;
+                if (fromName) updateData.from_name = fromName;
+                if (fromEmail) updateData.from_email = fromEmail;
+                if (replyTo) updateData.reply_to = replyTo;
                 if (status) updateData.status = status;
-                if (trackingConfig) updateData.trackingConfig = trackingConfig;
+                if (trackingConfig) updateData.tracking_config = trackingConfig;
 
                 // Update variables based on content
                 if (content && (!variables || variables.length === 0)) {

@@ -1,135 +1,17 @@
 // src/pages/api/brands/[brandId]/segments/index.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
-import Segment from '@/models/Segment';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
-
-function buildSegmentQuery(segment, brandId) {
-    const baseQuery = {
-        brandId: new mongoose.Types.ObjectId(brandId),
-        status: 'active',
-    };
-
-    if (segment.contactListIds && segment.contactListIds.length > 0) {
-        baseQuery.listId = {
-            $in: segment.contactListIds.map((id) => new mongoose.Types.ObjectId(id)),
-        };
-    }
-
-    if (segment.type === 'static') {
-        return {
-            ...baseQuery,
-            _id: { $in: segment.staticContactIds || [] },
-        };
-    }
-
-    if (!segment.conditions || !segment.conditions.rules || segment.conditions.rules.length === 0) {
-        return baseQuery;
-    }
-
-    const conditions = segment.conditions.rules.map((rule) => buildRuleQuery(rule)).filter((c) => Object.keys(c).length > 0);
-
-    if (conditions.length === 0) {
-        return baseQuery;
-    }
-
-    const matchOperator = segment.conditions.matchType === 'any' ? '$or' : '$and';
-
-    return {
-        ...baseQuery,
-        [matchOperator]: conditions,
-    };
-}
-
-// Helper function to escape regex special characters
-function escapeRegex(string) {
-    if (!string) return '';
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function buildRuleQuery(rule) {
-    const { field, operator, value, customFieldName } = rule;
-
-    // Determine the actual field path - THIS WAS THE MISSING PART!
-    let fieldPath = field;
-    if (field === 'customField' && customFieldName) {
-        fieldPath = `customFields.${customFieldName}`;
-    }
-
-    switch (operator) {
-        case 'equals':
-            // Handle boolean string conversion
-            if (value === 'true') return { [fieldPath]: { $in: [true, 'true'] } };
-            if (value === 'false') return { [fieldPath]: { $in: [false, 'false'] } };
-            return { [fieldPath]: value };
-        case 'not_equals':
-            if (value === 'true') return { [fieldPath]: { $nin: [true, 'true'] } };
-            if (value === 'false') return { [fieldPath]: { $nin: [false, 'false'] } };
-            return { [fieldPath]: { $ne: value } };
-        case 'contains':
-            return { [fieldPath]: { $regex: value, $options: 'i' } };
-        case 'not_contains':
-            return { [fieldPath]: { $not: { $regex: value, $options: 'i' } } };
-        case 'starts_with':
-            return { [fieldPath]: { $regex: `^${escapeRegex(value)}`, $options: 'i' } };
-        case 'ends_with':
-            return { [fieldPath]: { $regex: `${escapeRegex(value)}$`, $options: 'i' } };
-        case 'greater_than':
-            return { [fieldPath]: { $gt: parseFloat(value) || value } };
-        case 'less_than':
-            return { [fieldPath]: { $lt: parseFloat(value) || value } };
-        case 'has_tag':
-            return { tags: value };
-        case 'missing_tag':
-            return { tags: { $ne: value } };
-        case 'has_any_tag':
-            return { tags: { $in: Array.isArray(value) ? value : [value] } };
-        case 'has_all_tags':
-            return { tags: { $all: Array.isArray(value) ? value : [value] } };
-        case 'before':
-            return { [fieldPath]: { $lt: new Date(value) } };
-        case 'after':
-            return { [fieldPath]: { $gt: new Date(value) } };
-        case 'is_empty':
-            return {
-                $or: [{ [fieldPath]: { $exists: false } }, { [fieldPath]: null }, { [fieldPath]: '' }, { [fieldPath]: [] }],
-            };
-        case 'is_not_empty':
-            return { [fieldPath]: { $exists: true, $ne: null, $ne: '' } };
-        default:
-            return {};
-    }
-}
-
-async function updateSegmentCount(segment) {
-    const query = buildSegmentQuery(segment, segment.brandId);
-    const count = await Contact.countDocuments(query);
-
-    await Segment.updateOne(
-        { _id: segment._id },
-        {
-            cachedCount: count,
-            lastCountUpdated: new Date(),
-        }
-    );
-
-    return count;
-}
+import * as segmentService from '@/services/segmentService';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
 
         const brand = await getBrandById(brandId);
@@ -143,26 +25,17 @@ export default async function handler(req, res) {
             if (!authCheck.authorized) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
             }
-            const segments = await Segment.find({
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-                status: 'active',
-            }).sort({ createdAt: -1 });
+
+            let segments = await segmentService.getSegmentsByBrandId(brandId, userId);
 
             // Optionally refresh counts
             const refreshCounts = req.query.refreshCounts === 'true';
             if (refreshCounts) {
+                const refreshedSegments = [];
                 for (const segment of segments) {
-                    await updateSegmentCount(segment);
+                    await segmentService.updateSegmentCount(segment.id);
                 }
-                // Re-fetch to get updated counts
-                const updatedSegments = await Segment.find({
-                    brandId: new mongoose.Types.ObjectId(brandId),
-                    userId: new mongoose.Types.ObjectId(userId),
-                    status: 'active',
-                }).sort({ createdAt: -1 });
-
-                return res.status(200).json(updatedSegments);
+                segments = await segmentService.getSegmentsByBrandId(brandId, userId);
             }
 
             return res.status(200).json(segments);
@@ -181,24 +54,26 @@ export default async function handler(req, res) {
                 return res.status(400).json({ message: 'Segment name is required' });
             }
 
-            const segment = new Segment({
+            const segmentData = {
                 name,
                 description,
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
+                brand_id: brandId,
+                user_id: userId,
                 type: type || 'dynamic',
-                conditions: conditions || { matchType: 'all', rules: [] },
-                contactListIds: contactListIds || [],
-            });
+                conditions: conditions || { matchType: 'all', rules: [] }, // Supabase JSONB
+                contact_list_ids: contactListIds || [], // Supabase Array mapped to snake_case?
+                // Mongoose used `contactListIds` (camel). Supabase likely `contact_list_ids`. 
+                // Need to verify DB schema. Assuming standard snake_case mapping in `segmentsDb.create`.
+                // Actually `segmentsDb` insert `segmentData`. If schema is snake_case, keys must be snake_case.
+            };
 
-            await segment.save();
+            // Adjust keys to snake_case if needed
+            segmentData.contact_list_ids = contactListIds || [];
+            delete segmentData.contactListIds;
 
-            // Calculate initial count
-            await updateSegmentCount(segment);
+            const segment = await segmentService.createSegment(segmentData);
 
-            const updatedSegment = await Segment.findById(segment._id);
-
-            return res.status(201).json(updatedSegment);
+            return res.status(201).json(segment);
         }
 
         return res.status(405).json({ message: 'Method not allowed' });

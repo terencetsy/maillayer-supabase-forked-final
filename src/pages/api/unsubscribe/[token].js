@@ -1,14 +1,10 @@
-import connectToDatabase from '@/lib/mongodb';
-import Contact from '@/models/Contact';
-import Campaign from '@/models/Campaign';
+import { contactsDb } from '@/lib/db/contacts';
+import { campaignsDb } from '@/lib/db/campaigns';
+import { trackingDb } from '@/lib/db/tracking';
 import { verifyUnsubscribeToken, decodeUnsubscribeToken } from '@/lib/tokenUtils';
-import { createTrackingModel } from '@/models/TrackingEvent';
-import mongoose from 'mongoose';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
         const { token } = req.query;
 
         // Verify token is valid
@@ -26,12 +22,9 @@ export default async function handler(req, res) {
         // GET request - Show unsubscribe page
         if (req.method === 'GET') {
             // Fetch the contact to confirm it exists
-            const contact = await Contact.findOne({
-                _id: contactId,
-                brandId: brandId,
-            });
+            const contact = await contactsDb.getById(contactId);
 
-            if (!contact) {
+            if (!contact || contact.brand_id !== brandId && contact.brandId !== brandId) {
                 return res.status(404).json({ success: false, message: 'Contact not found' });
             }
 
@@ -39,7 +32,7 @@ export default async function handler(req, res) {
             return res.status(200).json({
                 success: true,
                 email: contact.email,
-                isUnsubscribed: contact.isUnsubscribed || false,
+                isUnsubscribed: contact.is_unsubscribed || contact.isUnsubscribed || false,
             });
         }
 
@@ -48,16 +41,15 @@ export default async function handler(req, res) {
             const { reason } = req.body;
 
             // Update contact as unsubscribed
-            const updatedContact = await Contact.findOneAndUpdate(
-                { _id: contactId, brandId: brandId },
+            const updatedContact = await contactsDb.update(
+                contactId,
                 {
                     status: 'unsubscribed',
-                    isUnsubscribed: true,
-                    unsubscribedAt: new Date(),
-                    unsubscribedFromCampaign: campaignId || null,
-                    unsubscribeReason: reason || null,
-                },
-                { new: true }
+                    is_unsubscribed: true,
+                    unsubscribed_at: new Date(),
+                    unsubscribed_from_campaign: campaignId || null,
+                    unsubscribe_reason: reason || null,
+                }
             );
 
             if (!updatedContact) {
@@ -67,20 +59,32 @@ export default async function handler(req, res) {
             // If we have a campaign ID, track this as an event and update campaign stats
             if (campaignId) {
                 // Create a tracking event
-                const TrackingModel = createTrackingModel(campaignId);
-
-                await TrackingModel.create({
-                    contactId: new mongoose.Types.ObjectId(contactId),
-                    campaignId: new mongoose.Types.ObjectId(campaignId),
+                await trackingDb.trackEvent({
+                    contact_id: contactId,
+                    campaign_id: campaignId,
                     email: updatedContact.email,
-                    eventType: 'unsubscribe',
+                    event_type: 'unsubscribe',
+                    created_at: new Date(),
                     metadata: {
                         reason: reason || 'No reason provided',
                     },
                 });
 
                 // Increment the campaign's unsubscribes count
-                await Campaign.findByIdAndUpdate(campaignId, { $inc: { 'stats.unsubscribes': 1 } }, { new: true });
+                // campaignsDb does not expose granular `inc`. Use get-update or specialized method.
+                // Assuming simple update for now or adding usage of specific helper if exists.
+                // For safety/concurrency, atomic inc is better but Supabase JS doesn't do `inc` easily without RPC.
+                // MVP: get and update.
+                try {
+                    const campaign = await campaignsDb.getById(campaignId);
+                    if (campaign) {
+                        const stats = campaign.stats || {};
+                        stats.unsubscribes = (stats.unsubscribes || 0) + 1;
+                        await campaignsDb.update(campaignId, { stats });
+                    }
+                } catch (e) {
+                    console.error('Error updating campaign stats:', e);
+                }
             }
 
             return res.status(200).json({ success: true, message: 'Successfully unsubscribed' });

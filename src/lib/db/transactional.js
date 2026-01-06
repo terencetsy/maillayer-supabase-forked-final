@@ -1,8 +1,12 @@
-import { supabase } from '../supabase'
+import { supabaseAdmin } from '../supabase'
+
+// Use supabaseAdmin for server-side DB operations to bypass RLS/Auth checks
+// This assumes authentication/authorization is handled by the caller (API route/Service)
+const db = supabaseAdmin
 
 export const transactionalDb = {
     async getTemplatesByBrandId(brandId) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_templates')
             .select('*')
             .eq('brand_id', brandId)
@@ -12,7 +16,7 @@ export const transactionalDb = {
     },
 
     async getTemplateById(templateId) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_templates')
             .select('*')
             .eq('id', templateId)
@@ -22,7 +26,7 @@ export const transactionalDb = {
     },
 
     async getTemplateByApiKey(apiKey) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_templates')
             .select('*')
             .eq('api_key', apiKey)
@@ -33,7 +37,7 @@ export const transactionalDb = {
     },
 
     async createTemplate(templateData) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_templates')
             .insert(templateData)
             .select()
@@ -43,7 +47,7 @@ export const transactionalDb = {
     },
 
     async updateTemplate(templateId, updates) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_templates')
             .update(updates)
             .eq('id', templateId)
@@ -54,7 +58,7 @@ export const transactionalDb = {
     },
 
     async deleteTemplate(templateId) {
-        const { error } = await supabase
+        const { error } = await db
             .from('transactional_templates')
             .delete()
             .eq('id', templateId)
@@ -63,7 +67,7 @@ export const transactionalDb = {
 
     // Logs
     async logEmail(logData) {
-        const { data, error } = await supabase
+        const { data, error } = await db
             .from('transactional_logs')
             .insert(logData)
             .select()
@@ -73,7 +77,7 @@ export const transactionalDb = {
     },
 
     async getLogs(templateId, { limit = 50, offset = 0, email = '', status = '' } = {}) {
-        let query = supabase
+        let query = db
             .from('transactional_logs')
             .select('*', { count: 'exact' })
             .eq('template_id', templateId)
@@ -104,7 +108,7 @@ export const transactionalDb = {
         // Counting 'opens' inside logs requires traversing JSONB array.
 
         // MVP: Query logs where events @> '[{"type": "open"}]'
-        const { count, error } = await supabase
+        const { count, error } = await db
             .from('transactional_logs')
             .select('*', { count: 'exact', head: true })
             .eq('template_id', templateId)
@@ -112,5 +116,16 @@ export const transactionalDb = {
 
         if (error) throw error
         return count
+    },
+
+    async updateLog(logId, updates) {
+        const { data, error } = await db
+            .from('transactional_logs')
+            .update(updates)
+            .eq('id', logId)
+            .select()
+            .single()
+        if (error) throw error
+        return data
     }
 }

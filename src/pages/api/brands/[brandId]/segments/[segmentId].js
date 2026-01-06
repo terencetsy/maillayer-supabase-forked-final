@@ -1,154 +1,17 @@
 // src/pages/api/brands/[brandId]/segments/[segmentId].js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
-import Segment from '@/models/Segment';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
-
-// Build segment query
-function buildSegmentQuery(segment, brandId) {
-    const baseQuery = {
-        brandId: new mongoose.Types.ObjectId(brandId),
-        status: 'active',
-    };
-
-    if (segment.contactListIds && segment.contactListIds.length > 0) {
-        baseQuery.listId = {
-            $in: segment.contactListIds.map((id) => new mongoose.Types.ObjectId(id)),
-        };
-    }
-
-    if (segment.type === 'static') {
-        return {
-            ...baseQuery,
-            _id: { $in: segment.staticContactIds || [] },
-        };
-    }
-
-    if (!segment.conditions || !segment.conditions.rules || segment.conditions.rules.length === 0) {
-        return baseQuery;
-    }
-
-    const conditions = segment.conditions.rules.map((rule) => buildRuleQuery(rule)).filter((c) => Object.keys(c).length > 0);
-
-    if (conditions.length === 0) {
-        return baseQuery;
-    }
-
-    const matchOperator = segment.conditions.matchType === 'any' ? '$or' : '$and';
-
-    return {
-        ...baseQuery,
-        [matchOperator]: conditions,
-    };
-}
-
-function buildRuleQuery(rule) {
-    const { field, operator, value, customFieldName } = rule;
-
-    // Determine the actual field path
-    let fieldPath = field;
-    if (field === 'customField' && customFieldName) {
-        fieldPath = `customFields.${customFieldName}`;
-    }
-
-    switch (operator) {
-        case 'equals':
-            // Handle boolean string conversion
-            if (value === 'true') return { [fieldPath]: { $in: [true, 'true'] } };
-            if (value === 'false') return { [fieldPath]: { $in: [false, 'false'] } };
-            return { [fieldPath]: value };
-
-        case 'not_equals':
-            if (value === 'true') return { [fieldPath]: { $nin: [true, 'true'] } };
-            if (value === 'false') return { [fieldPath]: { $nin: [false, 'false'] } };
-            return { [fieldPath]: { $ne: value } };
-
-        case 'contains':
-            return { [fieldPath]: { $regex: value, $options: 'i' } };
-
-        case 'not_contains':
-            return { [fieldPath]: { $not: { $regex: value, $options: 'i' } } };
-
-        case 'starts_with':
-            return { [fieldPath]: { $regex: `^${escapeRegex(value)}`, $options: 'i' } };
-
-        case 'ends_with':
-            return { [fieldPath]: { $regex: `${escapeRegex(value)}$`, $options: 'i' } };
-
-        case 'greater_than':
-            return { [fieldPath]: { $gt: parseFloat(value) || value } };
-
-        case 'less_than':
-            return { [fieldPath]: { $lt: parseFloat(value) || value } };
-
-        case 'has_tag':
-            return { tags: value };
-
-        case 'missing_tag':
-            return { tags: { $ne: value } };
-
-        case 'has_any_tag':
-            return { tags: { $in: Array.isArray(value) ? value : [value] } };
-
-        case 'has_all_tags':
-            return { tags: { $all: Array.isArray(value) ? value : [value] } };
-
-        case 'before':
-            return { [fieldPath]: { $lt: new Date(value) } };
-
-        case 'after':
-            return { [fieldPath]: { $gt: new Date(value) } };
-
-        case 'is_empty':
-            return {
-                $or: [{ [fieldPath]: { $exists: false } }, { [fieldPath]: null }, { [fieldPath]: '' }, { [fieldPath]: [] }],
-            };
-
-        case 'is_not_empty':
-            return {
-                [fieldPath]: { $exists: true, $ne: null, $ne: '' },
-            };
-
-        default:
-            return {};
-    }
-}
-
-// Helper function to escape regex special characters
-function escapeRegex(string) {
-    if (!string) return '';
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-async function updateSegmentCount(segment) {
-    const query = buildSegmentQuery(segment, segment.brandId);
-    const count = await Contact.countDocuments(query);
-
-    await Segment.updateOne(
-        { _id: segment._id },
-        {
-            cachedCount: count,
-            lastCountUpdated: new Date(),
-        }
-    );
-
-    return count;
-}
+import * as segmentService from '@/services/segmentService';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, segmentId } = req.query;
 
         const brand = await getBrandById(brandId);
@@ -162,11 +25,8 @@ export default async function handler(req, res) {
             if (!authCheck.authorized) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
             }
-            const segment = await Segment.findOne({
-                _id: new mongoose.Types.ObjectId(segmentId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
+
+            const segment = await segmentService.getSegmentById(segmentId, brandId, userId);
 
             if (!segment) {
                 return res.status(404).json({ message: 'Segment not found' });
@@ -188,31 +48,20 @@ export default async function handler(req, res) {
                 return res.status(400).json({ message: 'Segment name is required' });
             }
 
-            const segment = await Segment.findOneAndUpdate(
-                {
-                    _id: new mongoose.Types.ObjectId(segmentId),
-                    brandId: new mongoose.Types.ObjectId(brandId),
-                    userId: new mongoose.Types.ObjectId(userId),
-                },
-                {
-                    name,
-                    description,
-                    type: type || 'dynamic',
-                    conditions: conditions || { matchType: 'all', rules: [] },
-                    contactListIds: contactListIds || [],
-                    lastCountUpdated: null,
-                },
-                { new: true }
-            );
+            const updateData = {
+                name,
+                description,
+                type: type || 'dynamic',
+                conditions: conditions || { matchType: 'all', rules: [] },
+                contact_list_ids: contactListIds || [], // snake_case
+                last_count_updated: null, // trigger refresh
+            };
 
-            if (!segment) {
+            const updatedSegment = await segmentService.updateSegment(segmentId, brandId, userId, updateData);
+
+            if (!updatedSegment) {
                 return res.status(404).json({ message: 'Segment not found' });
             }
-
-            // Recalculate count
-            await updateSegmentCount(segment);
-
-            const updatedSegment = await Segment.findById(segment._id);
 
             return res.status(200).json(updatedSegment);
         }
@@ -224,13 +73,9 @@ export default async function handler(req, res) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
             }
 
-            const result = await Segment.deleteOne({
-                _id: new mongoose.Types.ObjectId(segmentId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            });
+            const success = await segmentService.deleteSegment(segmentId, brandId, userId);
 
-            if (result.deletedCount === 0) {
+            if (!success) {
                 return res.status(404).json({ message: 'Segment not found' });
             }
 
