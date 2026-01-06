@@ -1,10 +1,6 @@
 // src/pages/api/public/contacts/[apiKey]/tags.js
-// This allows external systems (like your app) to update tags via API
-
-import connectToDatabase from '@/lib/mongodb';
-import ContactList from '@/models/ContactList';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
+import { contactListsDb } from '@/lib/db/contactLists';
+import { contactsDb } from '@/lib/db/contacts';
 
 export default async function handler(req, res) {
     // Set CORS headers
@@ -21,8 +17,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        await connectToDatabase();
-
         const { apiKey } = req.query;
         const { email, tags, action = 'add' } = req.body;
 
@@ -39,17 +33,19 @@ export default async function handler(req, res) {
         }
 
         // Find the contact list by API key
-        const contactList = await ContactList.findOne({ apiKey, apiEnabled: true });
+        const contactList = await contactListsDb.getByApiKey(apiKey);
 
         if (!contactList) {
             return res.status(401).json({ success: false, message: 'Invalid or disabled API key' });
         }
 
-        // Check domain if restrictions are set
+        // Check domain if restrictions are set (use snake_case for DB columns)
+        const allowedDomains = contactList.allowed_domains || contactList.allowedDomains;
         const origin = req.headers.origin || req.headers.referer;
-        if (contactList.allowedDomains && contactList.allowedDomains.length > 0 && origin) {
+
+        if (allowedDomains && allowedDomains.length > 0 && origin) {
             const originDomain = new URL(origin).hostname;
-            const isAllowed = contactList.allowedDomains.some((d) => originDomain === d || originDomain.endsWith(`.${d}`));
+            const isAllowed = allowedDomains.some((d) => originDomain === d || originDomain.endsWith(`.${d}`));
             if (!isAllowed) {
                 return res.status(403).json({ success: false, message: 'Domain not allowed' });
             }
@@ -58,27 +54,11 @@ export default async function handler(req, res) {
         const normalizedTags = tags.map((t) => t.toLowerCase().trim());
 
         // Find and update the contact
-        let updateOperation;
-        if (action === 'add') {
-            updateOperation = { $addToSet: { tags: { $each: normalizedTags } } };
-        } else if (action === 'remove') {
-            updateOperation = { $pullAll: { tags: normalizedTags } };
-        } else if (action === 'set') {
-            updateOperation = { $set: { tags: normalizedTags } };
-        } else {
-            return res.status(400).json({ success: false, message: 'Invalid action' });
-        }
+        // Helper `updateTagsByEmail` finds by email + brandId and updates tags
+        const brandId = contactList.brand_id || contactList.brandId;
+        const updatedContact = await contactsDb.updateTagsByEmail(email.toLowerCase(), brandId, normalizedTags, action);
 
-        const contact = await Contact.findOneAndUpdate(
-            {
-                email: email.toLowerCase(),
-                brandId: contactList.brandId,
-            },
-            updateOperation,
-            { new: true }
-        );
-
-        if (!contact) {
+        if (!updatedContact) {
             return res.status(404).json({
                 success: false,
                 message: 'Contact not found',
@@ -88,8 +68,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
             success: true,
             message: 'Tags updated successfully',
-            contactId: contact._id,
-            tags: contact.tags,
+            contactId: updatedContact.id,
+            tags: updatedContact.tags,
         });
     } catch (error) {
         console.error('Error updating contact tags:', error);

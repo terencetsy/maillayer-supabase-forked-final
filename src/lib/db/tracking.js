@@ -11,50 +11,59 @@ export const trackingDb = {
         return data
     },
 
-    async getEvents(campaignId, { limit = 50, offset = 0, eventType = '', email = '', sort = 'created_at', order = 'desc' } = {}) {
-        let query = supabase
-            .from('tracking_events')
-            .select('*', { count: 'exact' })
-            .eq('campaign_id', campaignId)
-            .range(offset, offset + limit - 1)
-            .order(sort || 'created_at', { ascending: order === 'asc' })
-
-        if (eventType) {
-            query = query.eq('event_type', eventType)
-        }
-        if (email) {
-            query = query.ilike('email', `%${email}%`)
-        }
-
-        const { data, error, count } = await query
-        if (error) throw error
-        return { data, total: count }
-    },
-
-    // Aggregation helpers (using count queries for MVP)
     async countEvents(campaignId, eventType) {
         const { count, error } = await supabase
             .from('tracking_events')
-            .select('id', { count: 'exact', head: true }) // optimized count
+            .select('*', { count: 'exact', head: true })
             .eq('campaign_id', campaignId)
             .eq('event_type', eventType)
-
         if (error) throw error
         return count
     },
 
-    async getUniqueEmails(campaignId, eventType) {
-        // Supabase .select with distinct?
-        // Not natively easy without raw sql or logic.
-        // MVP: Use a specialized RPC `get_unique_interactions(campaign_id, event_type)`
-        // Fallback: fetch all stats (lightweight columns) and count unique in JS?
-        // OR: create a view?
+    async getEvents(campaignId, options = {}) {
+        const { limit = 50, offset = 0, eventType, email, sort = 'created_at', order = 'desc' } = options
 
-        // Let's assume we use an RPC for efficient stats, or just simple count if we defined unique constraints (unlikely).
-        // If we don't have RPC, we might fetch distinct emails.
-        // `supabase.from('tracking_events').select('email', { count: 'exact', head: false }).eq(...).range(...)`
+        let query = supabase
+            .from('tracking_events')
+            .select('*', { count: 'exact' })
+            .eq('campaign_id', campaignId)
 
-        // For now, let's keep it simple: Return null and let service handle aggregation via standard fetch if RPC missing.
-        return null;
+        if (eventType) {
+            query = query.eq('event_type', eventType)
+        }
+
+        if (email) {
+            query = query.eq('email', email)
+        }
+
+        query = query.order(sort, { ascending: order === 'asc' })
+            .range(offset, offset + limit - 1)
+
+        const { data, count, error } = await query
+        if (error) throw error
+
+        return { data, total: count }
+    },
+
+    // For Geostats: fetch metadata and user_agent for all events of a campaign
+    // Warning: Potential performance issue if millions of events.
+    async getEventsForStats(campaignId, eventType = null) {
+        let query = supabase
+            .from('tracking_events')
+            .select('metadata, user_agent, event_type')
+            .eq('campaign_id', campaignId)
+
+        if (eventType) {
+            query = query.eq('event_type', eventType)
+        }
+
+        // Supabase limit default 1000. Increase if needed for stats or handle pagination.
+        // For MVP, limit to 5000 is reasonable.
+        query = query.limit(5000);
+
+        const { data, error } = await query
+        if (error) throw error
+        return data
     }
 }

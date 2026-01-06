@@ -1,22 +1,24 @@
-// src/pages/api/brands/[id]/integrations/firebase.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { createIntegration, getIntegrationByType, updateIntegration } from '@/services/integrationService';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     const { brandId } = req.query;
 
+    const { user } = await getUserFromRequest(req, res);
+    if (!user) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     // Handle GET request to fetch integration
     if (req.method === 'GET') {
         try {
-            // Authenticate the user
-            const session = await getServerSession(req, res, authOptions);
-            if (!session) {
-                return res.status(401).json({ message: 'Unauthorized' });
-            }
+            // Check permission
+            // const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.VIEW_INTEGRATIONS);
+            // if (!authCheck.authorized) ...
 
             // Fetch the integration
-            const integration = await getIntegrationByType('firebase', brandId, session.user.id);
+            const integration = await getIntegrationByType('firebase', brandId, user.id);
 
             // If integration exists, return it
             if (integration) {
@@ -34,10 +36,10 @@ export default async function handler(req, res) {
     // Handle POST request to create or update integration
     if (req.method === 'POST') {
         try {
-            // Authenticate the user
-            const session = await getServerSession(req, res, authOptions);
-            if (!session) {
-                return res.status(401).json({ message: 'Unauthorized' });
+            // Permission for edit
+            const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.EDIT_INTEGRATIONS);
+            if (!authCheck.authorized) {
+                return res.status(authCheck.status).json({ message: authCheck.message });
             }
 
             const { name, serviceAccountJson, autoSyncConfig } = req.body;
@@ -66,14 +68,14 @@ export default async function handler(req, res) {
             }
 
             // Check if integration already exists
-            const existingIntegration = await getIntegrationByType('firebase', brandId, session.user.id);
+            const existingIntegration = await getIntegrationByType('firebase', brandId, user.id);
 
             // Extract auto-sync configuration if provided
             const autoSyncSettings = autoSyncConfig || {};
 
             if (existingIntegration) {
                 // Update existing integration
-                const updatedIntegration = await updateIntegration(existingIntegration._id, brandId, session.user.id, {
+                const updatedIntegration = await updateIntegration(existingIntegration.id, brandId, user.id, {
                     name,
                     config: {
                         ...existingIntegration.config,
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
                 const newIntegration = await createIntegration({
                     name,
                     type: 'firebase',
-                    userId: session.user.id,
+                    userId: user.id,
                     brandId,
                     config: {
                         serviceAccount,

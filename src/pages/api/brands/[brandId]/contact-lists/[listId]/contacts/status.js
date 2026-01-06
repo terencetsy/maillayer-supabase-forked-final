@@ -1,11 +1,7 @@
-// src/pages/api/brands/[brandId]/contact-lists/[listId]/contacts/status.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getContactListById } from '@/services/contactService';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
+import { contactsDb } from '@/lib/db/contacts';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
@@ -15,17 +11,12 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, listId } = req.query;
         const { contactId, status, reason } = req.body;
 
@@ -64,36 +55,27 @@ export default async function handler(req, res) {
 
         // Set additional fields based on status
         if (status === 'unsubscribed') {
-            updateData.isUnsubscribed = true;
-            updateData.unsubscribedAt = new Date();
-            updateData.unsubscribeReason = reason || 'Manual unsubscribe by admin';
+            updateData.is_unsubscribed = true;
+            updateData.unsubscribed_at = new Date();
+            updateData.unsubscribe_reason = reason || 'Manual unsubscribe by admin';
         } else if (status === 'bounced') {
-            updateData.isUnsubscribed = true; // Bounced contacts are also unsubscribed
-            updateData.bouncedAt = new Date();
-            updateData.bounceReason = reason || 'Manually marked as bounced';
-            updateData.unsubscribedAt = updateData.unsubscribedAt || new Date();
+            updateData.is_unsubscribed = true; // Bounced contacts are also unsubscribed
+            updateData.bounced_at = new Date();
+            updateData.bounce_reason = reason || 'Manually marked as bounced';
+            updateData.unsubscribed_at = updateData.unsubscribed_at || new Date();
         } else if (status === 'complained') {
-            updateData.isUnsubscribed = true; // Complained contacts are also unsubscribed
-            updateData.complainedAt = new Date();
-            updateData.complaintReason = reason || 'Manually marked as complained';
-            updateData.unsubscribedAt = updateData.unsubscribedAt || new Date();
+            updateData.is_unsubscribed = true; // Complained contacts are also unsubscribed
+            updateData.complained_at = new Date();
+            updateData.complaint_reason = reason || 'Manually marked as complained';
+            updateData.unsubscribed_at = updateData.unsubscribed_at || new Date();
         } else if (status === 'active') {
             // Reset unsubscribed status
-            updateData.isUnsubscribed = false;
+            updateData.is_unsubscribed = false;
             // We don't clear the timestamps to maintain historical record
         }
 
         // Update the contact
-        const contact = await Contact.findOneAndUpdate(
-            {
-                _id: new mongoose.Types.ObjectId(contactId),
-                listId: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(userId),
-            },
-            { $set: updateData },
-            { new: true }
-        );
+        const contact = await contactsDb.update(contactId, updateData);
 
         if (!contact) {
             return res.status(404).json({ message: 'Contact not found' });
@@ -102,7 +84,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
             message: 'Contact status updated successfully',
             contact: {
-                _id: contact._id,
+                _id: contact.id, // compatibility
+                id: contact.id,
                 email: contact.email,
                 status: contact.status,
             },

@@ -1,8 +1,6 @@
 // src/pages/api/brands/[brandId]/verification/verify-domain.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { getBrandById, updateBrand } from '@/services/brandService';
+import { getUserFromRequest } from '@/lib/supabase';
+import { brandsDb } from '@/lib/db/brands';
 import {
     SESClient,
     GetIdentityVerificationAttributesCommand,
@@ -29,24 +27,15 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
         // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
+        const { user } = await getUserFromRequest(req, res);
 
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
-
-        // Check if the brand belongs to the user
-        const brand = await getBrandById(brandId, true);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
 
         // Check permission - domain verification is an edit settings operation
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_SETTINGS);
@@ -54,8 +43,14 @@ export default async function handler(req, res) {
             return res.status(authCheck.status).json({ message: authCheck.message });
         }
 
-        // Make sure AWS credentials are set up first
-        if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
+        // Check if the brand exists
+        const brand = await brandsDb.getById(brandId);
+        if (!brand) {
+            return res.status(404).json({ message: 'Brand not found' });
+        }
+
+        // Make sure AWS credentials are set up first (snake_case)
+        if (!brand.aws_region || !brand.aws_access_key || !brand.aws_secret_key) {
             return res.status(400).json({ message: 'AWS credentials not set up. Please complete Step 1 first.' });
         }
 
@@ -74,26 +69,26 @@ export default async function handler(req, res) {
 
         // Initialize AWS SES and SNS clients
         const sesClient = new SESClient({
-            region: brand.awsRegion,
+            region: brand.aws_region,
             credentials: {
-                accessKeyId: brand.awsAccessKey,
-                secretAccessKey: brand.awsSecretKey,
+                accessKeyId: brand.aws_access_key,
+                secretAccessKey: brand.aws_secret_key,
             },
         });
 
         const sesv2Client = new SESv2Client({
-            region: brand.awsRegion,
+            region: brand.aws_region,
             credentials: {
-                accessKeyId: brand.awsAccessKey,
-                secretAccessKey: brand.awsSecretKey,
+                accessKeyId: brand.aws_access_key,
+                secretAccessKey: brand.aws_secret_key,
             },
         });
 
         const snsClient = new SNSClient({
-            region: brand.awsRegion,
+            region: brand.aws_region,
             credentials: {
-                accessKeyId: brand.awsAccessKey,
-                secretAccessKey: brand.awsSecretKey,
+                accessKeyId: brand.aws_access_key,
+                secretAccessKey: brand.aws_secret_key,
             },
         });
 
@@ -264,13 +259,13 @@ export default async function handler(req, res) {
                 // Continue even if setting default configuration set fails
             }
 
-            // Update sendingDomain and tracking information in brand
-            await updateBrand(brandId, {
-                sendingDomain: domain,
+            // Update sendingDomain and tracking information in brand (snake_case)
+            await brandsDb.update(brandId, {
+                sending_domain: domain,
                 status: 'pending_verification',
                 // Save SNS topic ARN and configuration set name for future use
-                snsBounceTopicArn: topicArn,
-                sesConfigurationSet: configurationSetName,
+                sns_bounce_topic_arn: topicArn,
+                ses_configuration_set: configurationSetName,
             });
 
             // Get the latest verification token

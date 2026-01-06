@@ -1,7 +1,6 @@
 import { supabaseAdmin } from '../supabase'
 
 // Use supabaseAdmin for server-side DB operations to bypass RLS/Auth checks
-// This assumes authentication/authorization is handled by the caller (API route/Service)
 const db = supabaseAdmin
 
 export const transactionalDb = {
@@ -76,46 +75,84 @@ export const transactionalDb = {
         return data
     },
 
-    async getLogs(templateId, { limit = 50, offset = 0, email = '', status = '' } = {}) {
+    async getLogs(templateId, { limit = 50, offset = 0, email = '', status = '', startDate = null, endDate = null } = {}) {
         let query = db
             .from('transactional_logs')
             .select('*', { count: 'exact' })
             .eq('template_id', templateId)
-            .range(offset, offset + limit - 1)
-            .order('created_at', { ascending: false })
 
         if (email) {
-            query = query.ilike('to_email', `%${email}%`) // Assuming column is 'to_email' or 'to'
+            query = query.ilike('to_email', `%${email}%`)
         }
         if (status) {
             query = query.eq('status', status)
         }
+        if (startDate) {
+            query = query.gte('created_at', startDate instanceof Date ? startDate.toISOString() : startDate)
+        }
+        if (endDate) {
+            query = query.lte('created_at', endDate instanceof Date ? endDate.toISOString() : endDate)
+        }
+
+        query = query.order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1)
 
         const { data, error, count } = await query
         if (error) throw error
         return { data, total: count }
     },
 
+    // Fetch all logs for stats aggregation (careful with large datasets)
+    async getAllLogsForStats(templateId, startDate, endDate) {
+        let query = db
+            .from('transactional_logs')
+            .select('created_at, status, events') // Select only needed fields
+            .eq('template_id', templateId)
+
+        if (startDate) {
+            query = query.gte('created_at', startDate instanceof Date ? startDate.toISOString() : startDate)
+        }
+        if (endDate) {
+            query = query.lte('created_at', endDate instanceof Date ? endDate.toISOString() : endDate)
+        }
+
+        // Supabase limit default 1000. Increase for stats.
+        query = query.limit(10000);
+
+        const { data, error } = await query
+        if (error) throw error
+        return data
+    },
+
     async countLogs(templateId, type) {
-        // Count events. Assuming 'events' is a JSONB column or separate table.
-        // Spec from previous code implies 'events' array in log.
-        // In Supabase/Postgres, checking inside JSONB array for counts is harder.
-        // If we have a separate 'transactional_events' table, clear.
-        // If JSONB: use arrow operators.
-
-        // BUT migration likely didn't normalize events.
-        // Simple count of logs is easy. 
-        // Counting 'opens' inside logs requires traversing JSONB array.
-
-        // MVP: Query logs where events @> '[{"type": "open"}]'
-        const { count, error } = await db
+        let query = db
             .from('transactional_logs')
             .select('*', { count: 'exact', head: true })
             .eq('template_id', templateId)
-            .contains('events', [{ type }])
 
+        if (type) {
+            query = query.contains('events', [{ type }])
+        }
+
+        const { count, error } = await query
         if (error) throw error
         return count
+    },
+
+    // Explicit count helper for flexible criteria (without loading data)
+    async countLogsWhere(templateId, criteria = {}) {
+        let query = db
+            .from('transactional_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('template_id', templateId)
+
+        if (criteria.status) query = query.eq('status', criteria.status);
+        if (criteria.eventType) query = query.contains('events', [{ type: criteria.eventType }]);
+        if (criteria.error) query = query.ilike('error', `%${criteria.error}%`); // basic error check
+
+        const { count, error } = await query;
+        if (error) throw error;
+        return count;
     },
 
     async updateLog(logId, updates) {

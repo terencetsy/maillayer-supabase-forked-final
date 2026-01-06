@@ -1,60 +1,37 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
 import { getCampaignById } from '@/services/campaignService';
 import { getBrandById } from '@/services/brandService';
 import { getCampaignStats, getCampaignEvents } from '@/services/trackingService';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
+import { getUserFromRequest } from '@/lib/supabase';
 
 export default async function handler(req, res) {
     try {
-        // Connect to database
-        await connectToDatabase();
-
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        const { user, error } = await getUserFromRequest(req);
+        if (error || !user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, id } = req.query;
 
         if (!brandId || !id) {
             return res.status(400).json({ message: 'Missing required parameters' });
         }
 
-        // Check if the brand exists
         const brand = await getBrandById(brandId);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
+        if (!brand) return res.status(404).json({ message: 'Brand not found' });
 
-        // Check permission (VIEW_CAMPAIGNS allows owners and team members)
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.VIEW_CAMPAIGNS);
-        if (!authCheck.authorized) {
-            return res.status(authCheck.status).json({ message: authCheck.message });
-        }
+        if (!authCheck.authorized) return res.status(authCheck.status).json({ message: authCheck.message });
 
-        // Check if campaign exists
         const campaign = await getCampaignById(id, brandId);
-        if (!campaign) {
-            return res.status(404).json({ message: 'Campaign not found' });
-        }
+        if (!campaign) return res.status(404).json({ message: 'Campaign not found' });
 
-        if (campaign.brandId.toString() !== brandId) {
-            return res.status(403).json({ message: 'Campaign does not belong to this brand' });
-        }
-
-        // GET request - get campaign stats
         if (req.method === 'GET') {
             try {
-                // Determine what kind of data to fetch
                 const { events, page, limit, eventType, email, sort, order } = req.query;
 
                 if (events === 'true') {
-                    // Fetch detailed events with pagination
                     const eventData = await getCampaignEvents(id, {
                         page: parseInt(page) || 1,
                         limit: parseInt(limit) || 50,
@@ -63,10 +40,8 @@ export default async function handler(req, res) {
                         sort,
                         order,
                     });
-
                     return res.status(200).json(eventData);
                 } else {
-                    // Fetch summary stats
                     const stats = await getCampaignStats(id);
                     return res.status(200).json(stats);
                 }

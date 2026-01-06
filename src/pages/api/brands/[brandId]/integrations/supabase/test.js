@@ -1,6 +1,4 @@
-// src/pages/api/brands/[brandId]/integrations/supabase/test.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType } from '@/services/integrationService';
 import { createClient } from '@supabase/supabase-js';
 
@@ -11,16 +9,15 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { brandId } = req.query;
 
         // Get the Supabase integration
-        const integration = await getIntegrationByType('supabase', brandId, session.user.id);
+        const integration = await getIntegrationByType('supabase', brandId, user.id);
 
         if (!integration) {
             return res.status(404).json({ message: 'Supabase integration not found' });

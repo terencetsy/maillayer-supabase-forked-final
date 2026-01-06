@@ -37,6 +37,11 @@ export const sequencesDb = {
         return data
     },
 
+    async delete(sequenceId) {
+        const { error } = await supabase.from('email_sequences').delete().eq('id', sequenceId)
+        if (error) throw error
+    },
+
     async createStep(sequenceId, stepData) {
         const { data, error } = await supabase
             .from('sequence_steps')

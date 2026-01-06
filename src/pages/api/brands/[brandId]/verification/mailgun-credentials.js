@@ -1,7 +1,5 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { getBrandById, updateBrand } from '@/services/brandService';
+import { getUserFromRequest } from '@/lib/supabase';
+import { brandsDb } from '@/lib/db/brands';
 import crypto from 'crypto';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
@@ -26,29 +24,26 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
         // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
+        const { user } = await getUserFromRequest(req, res);
 
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
-
-        // Check if the brand belongs to the user
-        const brand = await getBrandById(brandId, true);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
 
         // Check permission - updating credentials is an edit settings operation
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_SETTINGS);
         if (!authCheck.authorized) {
             return res.status(authCheck.status).json({ message: authCheck.message });
+        }
+
+        // Check if the brand exists
+        const brand = await brandsDb.getById(brandId);
+        if (!brand) {
+            return res.status(404).json({ message: 'Brand not found' });
         }
 
         const { mailgunApiKey, mailgunDomain, mailgunRegion = 'us', connectionType = 'api' } = req.body;
@@ -86,13 +81,13 @@ export default async function handler(req, res) {
             });
         }
 
-        // Prepare update data
+        // Prepare update data with snake_case
         const updateData = {
-            emailProvider: 'mailgun',
-            emailProviderConnectionType: connectionType,
-            mailgunApiKey: encryptData(mailgunApiKey, process.env.ENCRYPTION_KEY),
-            mailgunDomain,
-            mailgunRegion,
+            email_provider: 'mailgun',
+            email_provider_connection_type: connectionType,
+            mailgun_api_key: encryptData(mailgunApiKey, process.env.ENCRYPTION_KEY),
+            mailgun_domain: mailgunDomain,
+            mailgun_region: mailgunRegion,
         };
 
         // Update brand status if it's still in initial state
@@ -101,9 +96,9 @@ export default async function handler(req, res) {
         }
 
         // Update the brand
-        const success = await updateBrand(brandId, updateData);
+        const updatedBrand = await brandsDb.update(brandId, updateData);
 
-        if (success) {
+        if (updatedBrand) {
             return res.status(200).json({ message: 'Mailgun credentials saved successfully' });
         } else {
             return res.status(500).json({ message: 'Failed to save Mailgun credentials' });

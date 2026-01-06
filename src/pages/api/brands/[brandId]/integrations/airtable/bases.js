@@ -1,8 +1,7 @@
-// src/pages/api/brands/[id]/integrations/airtable/bases.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType } from '@/services/integrationService';
 import axios from 'axios';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     // Only allow GET requests
@@ -11,16 +10,19 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { brandId } = req.query;
 
+        // Check permission if strictly needed, though read-only
+        // const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.VIEW_INTEGRATIONS);
+        // if (!authCheck.authorized) ... 
+
         // Get the Airtable integration
-        const integration = await getIntegrationByType('airtable', brandId, session.user.id);
+        const integration = await getIntegrationByType('airtable', brandId, user.id);
 
         if (!integration) {
             return res.status(404).json({ message: 'Airtable integration not found' });
@@ -32,6 +34,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Airtable API key not configured' });
         }
         console.log('API Key:', apiKey); // Debugging line to check API key
+
         // Fetch bases from Airtable API
         const basesResponse = await axios.get('https://api.airtable.com/v0/meta/bases', {
             headers: {

@@ -1,7 +1,5 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
-import { getBrandById, updateBrand } from '@/services/brandService';
+import { getUserFromRequest } from '@/lib/supabase';
+import { brandsDb } from '@/lib/db/brands';
 import AWS from 'aws-sdk';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
@@ -12,24 +10,15 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
         // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
+        const { user } = await getUserFromRequest(req, res);
 
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
-
-        // Check if the brand belongs to the user
-        const brand = await getBrandById(brandId, true);
-        if (!brand) {
-            return res.status(404).json({ message: 'Brand not found' });
-        }
 
         // Check permission - email verification is an edit settings operation
         const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_SETTINGS);
@@ -37,8 +26,14 @@ export default async function handler(req, res) {
             return res.status(authCheck.status).json({ message: authCheck.message });
         }
 
-        // Make sure AWS credentials are set up first
-        if (!brand.awsRegion || !brand.awsAccessKey || !brand.awsSecretKey) {
+        // Check if the brand exists
+        const brand = await brandsDb.getById(brandId);
+        if (!brand) {
+            return res.status(404).json({ message: 'Brand not found' });
+        }
+
+        // Make sure AWS credentials are set up first (snake_case)
+        if (!brand.aws_region || !brand.aws_access_key || !brand.aws_secret_key) {
             return res.status(400).json({ message: 'AWS credentials not set up. Please complete Step 1 first.' });
         }
 
@@ -51,9 +46,9 @@ export default async function handler(req, res) {
 
         // Initialize AWS SES client
         const ses = new AWS.SES({
-            region: brand.awsRegion,
-            accessKeyId: brand.awsAccessKey,
-            secretAccessKey: brand.awsSecretKey,
+            region: brand.aws_region,
+            accessKeyId: brand.aws_access_key,
+            secretAccessKey: brand.aws_secret_key,
         });
 
         try {
@@ -64,8 +59,8 @@ export default async function handler(req, res) {
                 })
                 .promise();
 
-            // Update fromEmail in brand
-            await updateBrand(brandId, { fromEmail: email });
+            // Update fromEmail in brand (snake_case)
+            await brandsDb.update(brandId, { from_email: email });
 
             return res.status(200).json({
                 message: 'Verification email sent successfully',

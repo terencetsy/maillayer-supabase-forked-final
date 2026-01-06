@@ -1,11 +1,7 @@
-// src/pages/api/brands/[brandId]/contact-lists/[listId]/export.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getContactListById } from '@/services/contactService';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
+import { contactsDb } from '@/lib/db/contacts';
 import { Parser } from 'json2csv';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
@@ -16,17 +12,12 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, listId } = req.query;
         const status = req.query.status || '';
 
@@ -52,34 +43,22 @@ export default async function handler(req, res) {
             return res.status(404).json({ message: 'Contact list not found' });
         }
 
-        // Build query to get contacts
-        const query = {
-            listId: new mongoose.Types.ObjectId(listId),
-            brandId: new mongoose.Types.ObjectId(brandId),
-            userId: new mongoose.Types.ObjectId(userId),
-        };
-
-        // Add status filter if provided
-        if (status && status !== 'all') {
-            query.status = status;
-        }
-
         // Get all contacts in the list matching the query
-        const contacts = await Contact.find(query).sort({ email: 1 });
+        const contacts = await contactsDb.getAllForExport(listId, status);
 
         // Format contacts for CSV export (pick specific fields)
         const contactsForExport = contacts.map((contact) => ({
             email: contact.email,
-            firstName: contact.firstName || '',
-            lastName: contact.lastName || '',
+            firstName: contact.first_name || '',
+            lastName: contact.last_name || '',
             phone: contact.phone || '',
             status: contact.status || 'active',
-            createdAt: contact.createdAt ? new Date(contact.createdAt).toISOString().split('T')[0] : '',
-            unsubscribedAt: contact.unsubscribedAt ? new Date(contact.unsubscribedAt).toISOString().split('T')[0] : '',
-            unsubscribeReason: contact.unsubscribeReason || '',
-            bouncedAt: contact.bouncedAt ? new Date(contact.bouncedAt).toISOString().split('T')[0] : '',
-            bounceReason: contact.bounceReason || '',
-            complainedAt: contact.complainedAt ? new Date(contact.complainedAt).toISOString().split('T')[0] : '',
+            createdAt: contact.created_at ? new Date(contact.created_at).toISOString().split('T')[0] : '',
+            unsubscribedAt: contact.unsubscribed_at ? new Date(contact.unsubscribed_at).toISOString().split('T')[0] : '',
+            unsubscribeReason: contact.unsubscribe_reason || '',
+            bouncedAt: contact.bounced_at ? new Date(contact.bounced_at).toISOString().split('T')[0] : '',
+            bounceReason: contact.bounce_reason || '',
+            complainedAt: contact.complained_at ? new Date(contact.complained_at).toISOString().split('T')[0] : '',
         }));
 
         // Create CSV from contacts
@@ -103,7 +82,7 @@ export default async function handler(req, res) {
 
         // Set filename based on status filter
         let filename = contactList.name;
-        if (status) {
+        if (status && status !== 'all') {
             filename += `-${status}`;
         }
         filename += `-contacts.csv`;

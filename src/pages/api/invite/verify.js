@@ -1,4 +1,3 @@
-import connectToDatabase from '@/lib/mongodb';
 import { getTeamMemberByToken } from '@/services/teamMemberService';
 import { findUserByEmail } from '@/services/userService';
 
@@ -14,8 +13,6 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Token is required' });
         }
 
-        await connectToDatabase();
-
         const invitation = await getTeamMemberByToken(token);
 
         if (!invitation) {
@@ -27,9 +24,12 @@ export default async function handler(req, res) {
         // Check if user already exists
         const existingUser = await findUserByEmail(invitation.email);
 
+        // Populate brandName from invitation.brand (Supabase join returns object)
+        const brandName = invitation.brand ? invitation.brand.name : 'Unknown Brand';
+
         return res.status(200).json({
             email: invitation.email,
-            brandName: invitation.brandId.name,
+            brandName: brandName,
             role: invitation.role,
             userExists: !!existingUser,
         });

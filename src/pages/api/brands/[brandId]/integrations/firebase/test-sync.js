@@ -1,8 +1,7 @@
-// src/pages/api/brands/[id]/integrations/firebase/test-sync.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType } from '@/services/integrationService';
 import { admin } from '@/lib/firebase-admin';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     // Check if method is POST
@@ -11,9 +10,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
@@ -25,8 +23,11 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Brand ID is required' });
         }
 
+        // Check permission if desirable
+        // const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.VIEW_INTEGRATIONS);
+
         // Get the integration
-        const integration = await getIntegrationByType('firebase', brandId, session.user.id);
+        const integration = await getIntegrationByType('firebase', brandId, user.id);
 
         if (!integration) {
             return res.status(404).json({ message: 'Firebase integration not found' });

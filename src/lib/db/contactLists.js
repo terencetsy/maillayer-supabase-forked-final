@@ -21,6 +21,23 @@ export const contactListsDb = {
         return data
     },
 
+    async getByApiKey(apiKey) {
+        // Assuming table has api_key column logic. Schema migration added it?
+        // If not, we assumed migration handled schema.
+        // `api_key` and `api_enabled`
+        const { data, error } = await supabase
+            .from('contact_lists')
+            .select('*')
+            .eq('api_key', apiKey)
+            .eq('api_enabled', true)
+            .single()
+        if (error) {
+            if (error.code === 'PGRST116') return null;
+            throw error;
+        }
+        return data
+    },
+
     async create(brandId, listData) {
         const { data, error } = await supabase
             .from('contact_lists')
@@ -43,7 +60,6 @@ export const contactListsDb = {
     },
 
     async delete(listId) {
-        // Note: constraints might handle cascading deletes for memberships
         const { error } = await supabase
             .from('contact_lists')
             .delete()

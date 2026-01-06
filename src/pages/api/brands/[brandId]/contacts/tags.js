@@ -1,22 +1,16 @@
-// src/pages/api/brands/[brandId]/contacts/tags.js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
+import { contactsDb } from '@/lib/db/contacts';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
 
         const brand = await getBrandById(brandId);
@@ -30,15 +24,11 @@ export default async function handler(req, res) {
             if (!authCheck.authorized) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
             }
-            const tags = await Contact.distinct('tags', {
-                brandId: new mongoose.Types.ObjectId(brandId),
-            });
 
-            // Get count for each tag
-            const tagCounts = await Contact.aggregate([{ $match: { brandId: new mongoose.Types.ObjectId(brandId) } }, { $unwind: '$tags' }, { $group: { _id: '$tags', count: { $sum: 1 } } }, { $sort: { count: -1 } }]);
+            const tags = await contactsDb.getBrandTags(brandId);
 
             return res.status(200).json({
-                tags: tagCounts.map((t) => ({ name: t._id, count: t.count })),
+                tags: tags,
             });
         }
 
@@ -60,38 +50,12 @@ export default async function handler(req, res) {
             }
 
             const normalizedTags = tags.map((t) => t.toLowerCase().trim());
-            const objectIds = contactIds.map((id) => new mongoose.Types.ObjectId(id));
 
-            let result;
-            if (action === 'add') {
-                result = await Contact.updateMany(
-                    {
-                        _id: { $in: objectIds },
-                        brandId: new mongoose.Types.ObjectId(brandId),
-                    },
-                    { $addToSet: { tags: { $each: normalizedTags } } }
-                );
-            } else if (action === 'remove') {
-                result = await Contact.updateMany(
-                    {
-                        _id: { $in: objectIds },
-                        brandId: new mongoose.Types.ObjectId(brandId),
-                    },
-                    { $pullAll: { tags: normalizedTags } }
-                );
-            } else if (action === 'set') {
-                result = await Contact.updateMany(
-                    {
-                        _id: { $in: objectIds },
-                        brandId: new mongoose.Types.ObjectId(brandId),
-                    },
-                    { $set: { tags: normalizedTags } }
-                );
-            }
+            const modifiedCount = await contactsDb.updateTags(contactIds, brandId, normalizedTags, action);
 
             return res.status(200).json({
                 success: true,
-                modified: result.modifiedCount,
+                modified: modifiedCount,
             });
         }
 

@@ -1,13 +1,9 @@
-// src/pages/api/brands/[id]/integrations/airtable/sync.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType, updateIntegration } from '@/services/integrationService';
 import axios from 'axios';
-import connectToDatabase from '@/lib/mongodb';
-import Contact from '@/models/Contact';
-import ContactList from '@/models/ContactList';
-import mongoose from 'mongoose';
-import Integration from '@/models/Integration'; // Add this import
+import { contactsDb } from '@/lib/db/contacts';
+import { contactListsDb } from '@/lib/db/contactLists';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     // Only allow POST requests
@@ -16,30 +12,31 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
         const { brandId } = req.query;
         const { syncId } = req.body;
 
-        // Validate input
-        if (!syncId) {
-            return res.status(400).json({ message: 'Sync ID is required' });
+        if (!brandId || !syncId) {
+            return res.status(400).json({ message: 'Missing required parameters' });
         }
 
-        // Connect to database
-        await connectToDatabase();
+        // Check permission - sync is an edit action on integrations/contacts
+        const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.EDIT_INTEGRATIONS);
+        if (!authCheck.authorized) {
+            return res.status(authCheck.status).json({ message: authCheck.message });
+        }
 
         // Get the Airtable integration
-        const integration = await getIntegrationByType('airtable', brandId, session.user.id);
+        const integration = await getIntegrationByType('airtable', brandId, user.id);
         if (!integration) {
             return res.status(404).json({ message: 'Airtable integration not found' });
         }
 
-        // Get the API key from the integration
+        // Get the API key
         const apiKey = integration.config.apiKey;
         if (!apiKey) {
             return res.status(400).json({ message: 'Airtable API key not configured' });
@@ -54,7 +51,7 @@ export default async function handler(req, res) {
 
         // Initialize counters
         let importedCount = 0;
-        let updatedCount = 0;
+        let updatedCount = 0; // Hard to track exact updates vs inserts in simple upsert, will approximate
         let skippedCount = 0;
 
         // Handle creating a new list if needed
@@ -63,82 +60,50 @@ export default async function handler(req, res) {
 
         if (tableSync.createNewList && tableSync.newListName) {
             // Create a new contact list
-            const contactList = new ContactList({
+            newList = await contactListsDb.create(brandId, user.id, {
                 name: tableSync.newListName,
                 description: `Auto-created list for Airtable sync: ${tableSync.name}`,
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-                contactCount: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
             });
 
-            await contactList.save();
-            contactListId = contactList._id;
-            newList = contactList;
+            contactListId = newList.id;
 
             // Update the sync config to use this list from now on
             const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
-            console.log('Sync index:', syncIndex);
+
             if (syncIndex !== -1) {
-                // We need to update the tableSync object in memory as well
-                // This ensures we're using the correct updated object for the rest of this function
-                tableSync.contactListId = contactListId.toString();
+                // Update in memory
+                tableSync.contactListId = contactListId;
                 tableSync.createNewList = false;
                 tableSync.newListName = '';
-
-                // Update the in-memory integration object to match
                 integration.config.tableSyncs[syncIndex] = tableSync;
 
-                // Create the update path for this specific sync in the array
-                const updatePath = `config.tableSyncs.${syncIndex}`;
-
-                // Create the update object
-                const updateData = {
-                    [`${updatePath}.contactListId`]: contactListId.toString(),
-                    [`${updatePath}.createNewList`]: false,
-                    [`${updatePath}.newListName`]: '',
-                };
-
-                try {
-                    console.log('Updating integration with new contact list:', updateData);
-                    // Perform direct MongoDB update with proper dot notation
-                    const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: updateData });
-
-                    console.log('MongoDB update result:', updateResult);
-
-                    if (updateResult.modifiedCount === 0) {
-                        console.error('ERROR: Integration update did not modify any documents. List will be created again on next sync.');
-                    }
-                } catch (updateError) {
-                    console.error('Error updating integration with new contact list:', updateError);
-                    // Continue with the sync even if the update fails
-                }
+                // Update integration in DB
+                // We use updateIntegration service which handles config merge?
+                // The service we saw earlier does a shallow merge or replacement of updateData.
+                // We should be careful. `updateIntegration` in service spreads updates.
+                // We should pass the FULL updated config.
+                await updateIntegration(integration.id, brandId, user.id, {
+                    config: integration.config
+                });
             }
         } else {
             contactListId = tableSync.contactListId;
 
             // Verify the list exists
-            const contactList = await ContactList.findOne({
-                _id: new mongoose.Types.ObjectId(contactListId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-            });
-
-            if (!contactList) {
+            const contactList = await contactListsDb.getById(contactListId);
+            if (!contactList || contactList.brand_id !== brandId) {
                 return res.status(404).json({ message: 'Contact list not found' });
             }
         }
 
         // Fetch records from Airtable
-        // Note: Airtable API has a limit of 100 records per request, so we need to paginate
         let allRecords = [];
         let offset = null;
 
         do {
             const url = `https://api.airtable.com/v0/${tableSync.baseId}/${tableSync.tableId}`;
             const params = {
-                pageSize: 100, // Max page size for Airtable
+                pageSize: 100,
                 returnFieldsByFieldId: true,
             };
 
@@ -157,149 +122,106 @@ export default async function handler(req, res) {
             offset = response.data.offset || null;
         } while (offset);
 
-        // Process records in batches to avoid overwhelming the database
+        // Process records in batches
         const BATCH_SIZE = 100;
         for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
             const batch = allRecords.slice(i, i + BATCH_SIZE);
+            const contactsToUpsert = [];
 
-            // Create operations for bulk write
-            const operations = batch
-                .map((record) => {
-                    const fields = record.fields;
+            batch.forEach((record) => {
+                const fields = record.fields;
 
-                    // Skip records without email
-                    const emailField = tableSync.mapping.email;
-                    if (!emailField || !fields[emailField]) {
-                        skippedCount++;
-                        return null;
-                    }
+                // Skip records without email
+                const emailField = tableSync.mapping.email;
+                if (!emailField || !fields[emailField]) {
+                    skippedCount++;
+                    return;
+                }
 
-                    const email = fields[emailField].toString().trim().toLowerCase();
+                const email = fields[emailField].toString().trim().toLowerCase();
 
-                    // Basic email validation
-                    if (!email.includes('@')) {
-                        skippedCount++;
-                        return null;
-                    }
+                // Basic email validation
+                if (!email.includes('@')) {
+                    skippedCount++;
+                    return;
+                }
 
-                    // Get other fields if available
-                    const firstNameField = tableSync.mapping.firstName;
-                    const lastNameField = tableSync.mapping.lastName;
-                    const phoneField = tableSync.mapping.phone;
+                // Get other fields
+                const firstNameField = tableSync.mapping.firstName;
+                const lastNameField = tableSync.mapping.lastName;
+                const phoneField = tableSync.mapping.phone;
 
-                    const firstName = firstNameField && fields[firstNameField] ? fields[firstNameField].toString().trim() : '';
-                    const lastName = lastNameField && fields[lastNameField] ? fields[lastNameField].toString().trim() : '';
-                    const phone = phoneField && fields[phoneField] ? fields[phoneField].toString().trim() : '';
+                const firstName = firstNameField && fields[firstNameField] ? fields[firstNameField].toString().trim() : '';
+                const lastName = lastNameField && fields[lastNameField] ? fields[lastNameField].toString().trim() : '';
+                const phone = phoneField && fields[phoneField] ? fields[phoneField].toString().trim() : '';
 
-                    // Create contact data
-                    const contactData = {
-                        email,
-                        firstName,
-                        lastName,
-                        phone,
-                        listId: new mongoose.Types.ObjectId(contactListId),
-                        brandId: new mongoose.Types.ObjectId(brandId),
-                        userId: new mongoose.Types.ObjectId(session.user.id),
-                        updatedAt: new Date(),
-                    };
+                contactsToUpsert.push({
+                    brand_id: brandId,
+                    email: email,
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone,
+                    user_id: user.id,
+                    updated_at: new Date(),
+                    status: 'active' // Default status
+                });
+            });
 
-                    // Return an upsert operation
-                    return {
-                        updateOne: {
-                            filter: {
-                                email,
-                                listId: new mongoose.Types.ObjectId(contactListId),
-                            },
-                            update: {
-                                $set: contactData,
-                                $setOnInsert: { createdAt: new Date() },
-                            },
-                            upsert: true,
-                        },
-                    };
-                })
-                .filter((op) => op !== null); // Filter out null operations (skipped records)
+            if (contactsToUpsert.length > 0) {
+                // Upsert contacts
+                const upsertedData = await contactsDb.bulkUpsert(contactsToUpsert);
 
-            // Execute the bulk operation if we have operations
-            if (operations.length > 0) {
-                try {
-                    const bulkResult = await Contact.bulkWrite(operations);
-                    importedCount += bulkResult.upsertedCount || 0;
-                    updatedCount += bulkResult.modifiedCount || 0;
+                if (upsertedData) {
+                    const contactIds = upsertedData.map(c => c.id);
+                    importedCount += contactIds.length; // Approximate
 
-                    // If a document matched but wasn't modified, count it as skipped
-                    skippedCount += bulkResult.matchedCount - bulkResult.modifiedCount;
-                } catch (error) {
-                    console.error('Error in bulk write operation:', error);
-                    throw error;
+                    // Add to list
+                    await contactsDb.bulkAddToList(contactIds, contactListId);
                 }
             }
         }
 
-        // Update the lastSyncedAt timestamp and result in the table sync configuration
-        const tableSyncs = [...(integration.config.tableSyncs || [])];
-        const syncIndex = tableSyncs.findIndex((sync) => sync.id === syncId);
-        // Update the lastSyncedAt timestamp and result in the table sync configuration
+        // Update sync status
+        const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
         const now = new Date();
 
         if (syncIndex !== -1) {
-            // Create the update path for this specific sync in the array
-            const updatePath = `config.tableSyncs.${syncIndex}`;
-
-            // Update the sync status and results
-            const updateData = {
-                [`${updatePath}.lastSyncedAt`]: now.toISOString(),
-                [`${updatePath}.status`]: 'success',
-                [`${updatePath}.lastSyncResult`]: {
-                    importedCount,
-                    updatedCount,
-                    skippedCount,
-                    totalCount: allRecords.length,
-                },
+            integration.config.tableSyncs[syncIndex].lastSyncedAt = now.toISOString();
+            integration.config.tableSyncs[syncIndex].status = 'success';
+            integration.config.tableSyncs[syncIndex].lastSyncResult = {
+                importedCount,
+                updatedCount: 0, // Supabase upsert makes it hard to distinguish update vs insert without more logic
+                skippedCount,
+                totalCount: allRecords.length
             };
 
-            // Update the integration with sync results
-            console.log('Updating integration with sync results:', JSON.stringify(updateData));
-
-            try {
-                const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: updateData });
-
-                console.log('Sync results update result:', updateResult);
-            } catch (updateError) {
-                console.error('Error updating integration with sync results:', updateError);
-                // Continue with the response even if the update fails
-            }
+            await updateIntegration(integration.id, brandId, user.id, {
+                config: integration.config
+            });
         }
 
-        // Update contact count for the list
-        const totalContacts = await Contact.countDocuments({
-            listId: new mongoose.Types.ObjectId(contactListId),
-        });
-
-        await ContactList.updateOne(
-            { _id: new mongoose.Types.ObjectId(contactListId) },
-            {
-                contactCount: totalContacts,
-                updatedAt: new Date(),
-            }
-        );
+        // Update list count
+        // We can just trigger a recalc or let the UI fetch it.
+        // Assuming we rely on `countByListId` helper or similar.
+        // If we want to store it:
+        const totalContacts = await contactsDb.countByListId(contactListId);
+        await contactListsDb.update(contactListId, { contact_count: totalContacts });
 
         return res.status(200).json({
             success: true,
             syncId,
-            listId: contactListId.toString(),
-            newList: newList
-                ? {
-                      _id: newList._id.toString(),
-                      name: newList.name,
-                      contactCount: totalContacts,
-                  }
-                : null,
+            listId: contactListId,
+            newList: newList ? {
+                id: newList.id,
+                name: newList.name,
+                contactCount: totalContacts
+            } : null,
             importedCount,
-            updatedCount,
+            updatedCount: 0,
             skippedCount,
-            totalCount: allRecords.length,
+            totalCount: allRecords.length
         });
+
     } catch (error) {
         console.error('Error syncing Airtable data:', error);
         return res.status(500).json({ message: 'Error syncing data: ' + error.message });

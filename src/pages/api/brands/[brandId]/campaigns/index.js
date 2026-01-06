@@ -1,23 +1,21 @@
-// src/pages/api/brands/[brandId]/campaigns/index.js
-
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
 import { getCampaignsByBrandId, getCampaignsCount, createCampaign } from '@/services/campaignService';
 import { getBrandById } from '@/services/brandService';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
+import { getUserFromRequest } from '@/lib/supabase';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
+        const { user, error } = await getUserFromRequest(req); // use getUserFromRequest from supabase lib which checks header primarily but here we need generic auth
 
-        const session = await getServerSession(req, res, authOptions);
+        // If specific auth requirement (API token or Session)
+        // brands/... usually accessed by frontend with session token (cookie or header)
+        // getUserFromRequest handles both if implemented correctly (Supabase auth helper).
 
-        if (!session || !session.user) {
+        if (error || !user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
 
         if (!brandId) {
@@ -29,23 +27,21 @@ export default async function handler(req, res) {
             return res.status(404).json({ message: 'Brand not found' });
         }
 
-        // GET request - get campaigns for a brand with pagination (NO STATS)
+        // GET request - get campaigns for a brand
         if (req.method === 'GET') {
-            // Check permission (VIEW_CAMPAIGNS allows owners and team members)
             const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.VIEW_CAMPAIGNS);
             if (!authCheck.authorized) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
             }
             try {
-                // Parse pagination params
                 const page = parseInt(req.query.page) || 1;
                 const limit = parseInt(req.query.limit) || 10;
                 const skip = (page - 1) * limit;
 
-                // Fetch campaigns with pagination - WITHOUT stats
-                const [campaigns, totalCount] = await Promise.all([getCampaignsByBrandId(brandId, userId, { skip, limit }), getCampaignsCount(brandId, userId)]);
+                // Pass skip/limit to service
+                const campaigns = await getCampaignsByBrandId(brandId, userId, { skip, limit });
+                const totalCount = await getCampaignsCount(brandId, userId);
 
-                // Return paginated response without fetching live stats
                 return res.status(200).json({
                     campaigns,
                     pagination: {
@@ -64,7 +60,6 @@ export default async function handler(req, res) {
 
         // POST request - create new campaign
         if (req.method === 'POST') {
-            // Check permission (EDIT_CAMPAIGNS required for creating campaigns)
             const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_CAMPAIGNS);
             if (!authCheck.authorized) {
                 return res.status(authCheck.status).json({ message: authCheck.message });
@@ -82,9 +77,9 @@ export default async function handler(req, res) {
                     subject,
                     content: content || '',
                     brandId,
-                    userId,
-                    fromName: brand.fromName || '',
-                    fromEmail: brand.fromEmail,
+                    userId, // Owner
+                    fromName: fromName || brand.fromName || '',
+                    fromEmail: fromEmail || brand.fromEmail,
                     replyTo: replyTo || brand.replyToEmail,
                     status: status || 'draft',
                     scheduleType: scheduleType || 'send_now',

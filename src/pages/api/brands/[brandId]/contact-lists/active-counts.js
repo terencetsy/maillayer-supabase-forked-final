@@ -1,10 +1,6 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
-import { getActiveContactsCount } from '@/services/contactService';
-import Contact from '@/models/Contact';
-import mongoose from 'mongoose';
+import { contactsDb } from '@/lib/db/contacts';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
@@ -14,17 +10,12 @@ export default async function handler(req, res) {
             return res.status(405).json({ message: 'Method not allowed' });
         }
 
-        // Connect to database
-        await connectToDatabase();
-
-        // Get session directly from server
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId } = req.query;
         const listIds = req.query.listIds ? req.query.listIds.split(',') : [];
 
@@ -49,37 +40,7 @@ export default async function handler(req, res) {
             return res.status(200).json({});
         }
 
-        // Query to get counts for all lists in one go
-        const listObjectIds = listIds.map((id) => new mongoose.Types.ObjectId(id));
-
-        // In the aggregation query for active contacts
-        const countsResult = await Contact.aggregate([
-            {
-                $match: {
-                    listId: { $in: listObjectIds },
-                    brandId: new mongoose.Types.ObjectId(brandId),
-                    userId: new mongoose.Types.ObjectId(userId),
-                    status: 'active', // Only count active contacts
-                },
-            },
-            {
-                $group: {
-                    _id: '$listId',
-                    count: { $sum: 1 },
-                },
-            },
-        ]);
-
-        // Convert to a more usable format
-        const counts = {};
-        countsResult.forEach((item) => {
-            counts[item._id.toString()] = item.count;
-        });
-
-        // Make sure all requested lists have a count
-        listIds.forEach((id) => {
-            if (!counts[id]) counts[id] = 0;
-        });
+        const counts = await contactsDb.getCountsByListIds(listIds, brandId);
 
         return res.status(200).json(counts);
     } catch (error) {

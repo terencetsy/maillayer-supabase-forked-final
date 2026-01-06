@@ -1,13 +1,9 @@
-// src/pages/api/brands/[id]/integrations/google-sheets/sync.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import { getIntegrationByType } from '@/services/integrationService';
+import { getUserFromRequest } from '@/lib/supabase';
+import { getIntegrationByType, updateIntegration } from '@/services/integrationService';
 import { google } from 'googleapis';
-import connectToDatabase from '@/lib/mongodb';
-import Contact from '@/models/Contact';
-import ContactList from '@/models/ContactList';
-import mongoose from 'mongoose';
-import Integration from '@/models/Integration'; // Add this import
+import { contactsDb } from '@/lib/db/contacts';
+import { contactListsDb } from '@/lib/db/contactLists';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     // Only allow POST requests
@@ -16,9 +12,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
@@ -30,11 +25,14 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Sync ID is required' });
         }
 
-        // Connect to database
-        await connectToDatabase();
+        // Check permission
+        const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.EDIT_INTEGRATIONS);
+        if (!authCheck.authorized) {
+            return res.status(authCheck.status).json({ message: authCheck.message });
+        }
 
         // Get the Google Sheets integration
-        const integration = await getIntegrationByType('google_sheets', brandId, session.user.id);
+        const integration = await getIntegrationByType('google_sheets', brandId, user.id);
         if (!integration) {
             return res.status(404).json({ message: 'Google Sheets integration not found' });
         }
@@ -115,64 +113,35 @@ export default async function handler(req, res) {
         if (tableSync.createNewList && tableSync.newListName) {
             console.log('### creating new contact list...');
             // Create a new contact list
-            const contactList = new ContactList({
+            newList = await contactListsDb.create(brandId, user.id, {
                 name: tableSync.newListName,
                 description: `Auto-created list for Google Sheets sync: ${tableSync.name}`,
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-                contactCount: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
             });
+            contactListId = newList.id;
+            console.log('Created new contact list with ID:', contactListId);
 
-            await contactList.save();
-            contactListId = contactList._id;
-            newList = contactList;
-            console.log('Created new contact list with ID:', contactListId.toString());
-
-            // Update the sync config using direct MongoDB update
+            // Update the sync config using updateIntegration
             const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
             console.log('Sync index:', syncIndex);
 
             if (syncIndex !== -1) {
-                // Create the update path for this specific sync in the array
-                const updatePath = `config.tableSyncs.${syncIndex}`;
+                // Update in memory
+                tableSync.contactListId = contactListId;
+                tableSync.createNewList = false;
+                tableSync.newListName = '';
+                integration.config.tableSyncs[syncIndex] = tableSync;
 
-                // Create a copy of the sync with updated values
-                const updatedSync = {
-                    ...integration.config.tableSyncs[syncIndex],
-                    contactListId: contactListId.toString(),
-                    createNewList: false,
-                    newListName: '',
-                };
-
-                console.log('Updated sync:', updatedSync);
-
-                try {
-                    // Perform direct MongoDB update
-                    const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: { [updatePath]: updatedSync } });
-
-                    console.log('MongoDB update result:', updateResult);
-
-                    if (updateResult.modifiedCount === 0) {
-                        console.log('WARNING: Integration update did not modify any documents');
-                    }
-                } catch (updateError) {
-                    console.error('Error updating integration with new contact list:', updateError);
-                    // Continue with the sync even if the update fails
-                }
+                // Update integration in DB
+                await updateIntegration(integration.id, brandId, user.id, {
+                    config: integration.config
+                });
             }
         } else {
             contactListId = tableSync.contactListId;
 
             // Verify the list exists
-            const contactList = await ContactList.findOne({
-                _id: new mongoose.Types.ObjectId(contactListId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-            });
-
-            if (!contactList) {
+            const contactList = await contactListsDb.getById(contactListId);
+            if (!contactList || contactList.brand_id !== brandId) {
                 return res.status(404).json({ message: 'Contact list not found' });
             }
         }
@@ -182,77 +151,47 @@ export default async function handler(req, res) {
 
         for (let i = 0; i < dataRows.length; i += BATCH_SIZE) {
             const batch = dataRows.slice(i, i + BATCH_SIZE);
+            const contactsToUpsert = [];
 
-            // Modify the contacts processing logic to preserve existing status
-            // Find this part in the file and update it:
+            batch.forEach((row) => {
+                // Skip rows without email
+                if (!row || !row[emailColumnIndex]) {
+                    skippedCount++;
+                    return;
+                }
 
-            // Create operations for bulk write
-            const operations = batch
-                .map((row) => {
-                    // Skip rows without email
-                    if (!row || !row[emailColumnIndex]) {
-                        skippedCount++;
-                        return null;
-                    }
+                const email = row[emailColumnIndex].toString().trim().toLowerCase();
 
-                    const email = row[emailColumnIndex].toString().trim().toLowerCase();
+                // Basic email validation
+                if (!email.includes('@')) {
+                    skippedCount++;
+                    return;
+                }
 
-                    // Basic email validation
-                    if (!email.includes('@')) {
-                        skippedCount++;
-                        return null;
-                    }
+                // Get other fields if available
+                const firstName = firstNameColumnIndex >= 0 && row[firstNameColumnIndex] ? row[firstNameColumnIndex].toString().trim() : '';
+                const lastName = lastNameColumnIndex >= 0 && row[lastNameColumnIndex] ? row[lastNameColumnIndex].toString().trim() : '';
+                const phone = phoneColumnIndex >= 0 && row[phoneColumnIndex] ? row[phoneColumnIndex].toString().trim() : '';
 
-                    // Get other fields if available
-                    const firstName = firstNameColumnIndex >= 0 && row[firstNameColumnIndex] ? row[firstNameColumnIndex].toString().trim() : '';
-                    const lastName = lastNameColumnIndex >= 0 && row[lastNameColumnIndex] ? row[lastNameColumnIndex].toString().trim() : '';
-                    const phone = phoneColumnIndex >= 0 && row[phoneColumnIndex] ? row[phoneColumnIndex].toString().trim() : '';
+                contactsToUpsert.push({
+                    brand_id: brandId,
+                    email: email,
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone,
+                    user_id: user.id,
+                    updated_at: new Date(),
+                    status: 'active'
+                });
+            });
 
-                    // Create contact data - remove status from here
-                    const contactData = {
-                        email,
-                        firstName,
-                        lastName,
-                        phone,
-                        // status: 'active', // REMOVED THIS LINE
-                        listId: new mongoose.Types.ObjectId(contactListId),
-                        brandId: new mongoose.Types.ObjectId(brandId),
-                        userId: new mongoose.Types.ObjectId(session.user.id),
-                        updatedAt: new Date(),
-                    };
+            if (contactsToUpsert.length > 0) {
+                const upsertedData = await contactsDb.bulkUpsert(contactsToUpsert);
+                if (upsertedData) {
+                    const contactIds = upsertedData.map(c => c.id);
+                    importedCount += contactIds.length;
 
-                    // Return an upsert operation with modified update
-                    return {
-                        updateOne: {
-                            filter: {
-                                email,
-                                listId: new mongoose.Types.ObjectId(contactListId),
-                            },
-                            update: {
-                                $set: contactData,
-                                $setOnInsert: {
-                                    createdAt: new Date(),
-                                    // No need to set status as the model default is 'active'
-                                },
-                            },
-                            upsert: true,
-                        },
-                    };
-                })
-                .filter((op) => op !== null); // Filter out null operations (skipped rows)
-
-            // Execute the bulk operation if we have operations
-            if (operations.length > 0) {
-                try {
-                    const bulkResult = await Contact.bulkWrite(operations);
-                    importedCount += bulkResult.upsertedCount || 0;
-                    updatedCount += bulkResult.modifiedCount || 0;
-
-                    // If a document matched but wasn't modified, count it as skipped
-                    skippedCount += bulkResult.matchedCount - bulkResult.modifiedCount;
-                } catch (error) {
-                    console.error('Error in bulk write operation:', error);
-                    throw error;
+                    await contactsDb.bulkAddToList(contactIds, contactListId);
                 }
             }
         }
@@ -264,63 +203,39 @@ export default async function handler(req, res) {
         const syncIndex = integration.config.tableSyncs.findIndex((sync) => sync.id === syncId);
 
         if (syncIndex !== -1) {
-            // Create the update path for this specific sync in the array
-            const updatePath = `config.tableSyncs.${syncIndex}`;
-
-            // Update the sync status and results
-            const updateData = {
-                [`${updatePath}.lastSyncedAt`]: now.toISOString(),
-                [`${updatePath}.status`]: 'success',
-                [`${updatePath}.lastSyncResult`]: {
-                    importedCount,
-                    updatedCount,
-                    skippedCount,
-                    totalCount: dataRows.length,
-                },
+            integration.config.tableSyncs[syncIndex].lastSyncedAt = now.toISOString();
+            integration.config.tableSyncs[syncIndex].status = 'success';
+            integration.config.tableSyncs[syncIndex].lastSyncResult = {
+                importedCount,
+                updatedCount: 0,
+                skippedCount,
+                totalCount: dataRows.length
             };
 
-            // Update the integration with sync results
-            console.log('Updating integration with sync results:', JSON.stringify(updateData));
-
-            try {
-                const updateResult = await Integration.updateOne({ _id: integration._id }, { $set: updateData });
-
-                console.log('Sync results update result:', updateResult);
-            } catch (updateError) {
-                console.error('Error updating integration with sync results:', updateError);
-                // Continue with the response even if the update fails
-            }
+            await updateIntegration(integration.id, brandId, user.id, {
+                config: integration.config
+            });
         }
 
         // Update contact count for the list
-        const totalContacts = await Contact.countDocuments({
-            listId: new mongoose.Types.ObjectId(contactListId),
-        });
-
-        await ContactList.updateOne(
-            { _id: new mongoose.Types.ObjectId(contactListId) },
-            {
-                contactCount: totalContacts,
-                updatedAt: new Date(),
-            }
-        );
+        const totalContacts = await contactsDb.countByListId(contactListId);
+        await contactListsDb.update(contactListId, { contact_count: totalContacts });
 
         return res.status(200).json({
             success: true,
             syncId,
-            listId: contactListId.toString(),
-            newList: newList
-                ? {
-                      _id: newList._id.toString(),
-                      name: newList.name,
-                      contactCount: totalContacts,
-                  }
-                : null,
+            listId: contactListId,
+            newList: newList ? {
+                id: newList.id,
+                name: newList.name,
+                contactCount: totalContacts
+            } : null,
             importedCount,
-            updatedCount,
+            updatedCount: 0,
             skippedCount,
-            totalCount: dataRows.length,
+            totalCount: dataRows.length
         });
+
     } catch (error) {
         console.error('Error syncing Google Sheets data:', error);
         return res.status(500).json({ message: 'Error syncing data: ' + error.message });

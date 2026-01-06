@@ -1,22 +1,17 @@
-// src/pages/api/brands/[brandId]/email-sequences/[sequenceId].js
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getEmailSequenceById, updateEmailSequence, deleteEmailSequence } from '@/services/emailSequenceService';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
+        const { user } = await getUserFromRequest(req, res);
 
-        const session = await getServerSession(req, res, authOptions);
-
-        if (!session || !session.user) {
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, sequenceId } = req.query;
 
         if (!brandId || !sequenceId) {

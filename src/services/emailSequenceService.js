@@ -79,36 +79,7 @@ export async function updateEmailSequence(sequenceId, brandId, updateData) {
 }
 
 export async function deleteEmailSequence(sequenceId, brandId) {
-    // In Supabase, if we set ON DELETE CASCADE on foreign keys, steps delete auto.
-    // Assuming we do simply:
-    // We don't have a delete method in sequencesDb yet?
-    // Let's assume we add it or use direct supabase call here if needed, 
-    // but standard approach is usually valid.
-    // Checking sequencesDb... it doesn't have delete().
-    // I should add delete() to sequencesDb or just direct call.
-    // For now, let's assume direct delete or add it.
-    // sequencesDb lacks delete. I'll use a direct call for safety or add it later.
-    // Actually, I can just use sequencesDb.update(id, {status: 'deleted'}) if soft,
-    // but legacy was deleteOne.
-    // Let's assume sequencesDb has delete or I add it implicitly next.
-    // Wait, I can't add it implicitly. I should add it to sequencesDb.
-
-    // To solve this properly:
-    // I will use direct Supabase client export here if I imported it?
-    // But I didn't import supabase here.
-    // I should strictly use `sequencesDb`.
-    // I should update `sequences.js` to include `delete`.
-
-    // However, for this file update, I'll stick to what sequencesDb has.
-    // If it lacks delete, I'll return false or throw.
-    // Let's check Step 293. It has update, updateStep, deleteStep. NO `delete` (sequence).
-
-    // I'll update `sequences.js` one more time to add `delete` sequence method?
-    // Or just comment it out for now.
-
-    // Let's assume delete is rare or handled by UI soft deletes.
-    // But verification will fail if I don't implement it.
-    // I'll add `delete` to `sequencesDb` first.
+    await sequencesDb.delete(sequenceId);
     return true;
 }
 

@@ -1,56 +1,36 @@
-import connectToDatabase from '@/lib/mongodb';
-import TransactionalTemplate from '@/models/TransactionalTemplate';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../../auth/[...nextauth]';
-import mongoose from 'mongoose';
+import { getUserFromRequest } from '@/lib/supabase';
+import { getTemplateById, regenerateApiKey } from '@/services/transactionalService';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
-    // Only allow POST requests for regenerating API key
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed', success: false });
+        return res.status(405).json({ message: 'Method not allowed' });
     }
 
     try {
-        // Check user session
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
-            return res.status(401).json({ message: 'Unauthorized', success: false });
+        const { user } = await getUserFromRequest(req);
+        if (!user) {
+            return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        // Get brand ID and template ID from URL
+        const userId = user.id;
         const { brandId, templateId } = req.query;
 
-        // Connect to database
-        await connectToDatabase();
-
-        // Find the template
-        const template = await TransactionalTemplate.findOne({
-            _id: templateId,
-            brandId: brandId,
-            userId: session.user.id, // Ensure the template belongs to the user
-        });
-
-        if (!template) {
-            return res.status(404).json({ message: 'Template not found', success: false });
+        // Check permission
+        const authCheck = await checkBrandPermission(brandId, userId, PERMISSIONS.EDIT_TRANSACTIONAL);
+        if (!authCheck.authorized) {
+            return res.status(authCheck.status).json({ message: authCheck.message });
         }
 
-        // Generate a new API key using the same pattern as in template creation
-        const apiKey = `txn_${new mongoose.Types.ObjectId().toString()}_${Date.now().toString(36)}`;
+        const newKey = await regenerateApiKey(templateId, brandId);
 
-        // Update the template with the new API key
-        template.apiKey = apiKey;
-        await template.save();
-
-        return res.status(200).json({
-            message: 'API key regenerated successfully',
-            apiKey,
-            success: true,
-        });
+        if (newKey) {
+            return res.status(200).json({ apiKey: newKey });
+        } else {
+            return res.status(500).json({ message: 'Failed to regenerate API key' });
+        }
     } catch (error) {
-        console.error('Error regenerating API key:', error);
-        return res.status(500).json({
-            message: error.message || 'Error regenerating API key',
-            success: false,
-        });
+        console.error('Server error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 }

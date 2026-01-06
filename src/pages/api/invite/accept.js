@@ -1,4 +1,3 @@
-import connectToDatabase from '@/lib/mongodb';
 import { getTeamMemberByToken, acceptInvitation, acceptInvitationNewUser } from '@/services/teamMemberService';
 import { findUserByEmail } from '@/services/userService';
 
@@ -14,8 +13,6 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Token is required' });
         }
 
-        await connectToDatabase();
-
         // Verify token first
         const invitation = await getTeamMemberByToken(token);
 
@@ -30,7 +27,8 @@ export default async function handler(req, res) {
 
         if (existingUser) {
             // Existing user - just link the account
-            const success = await acceptInvitation(token, existingUser._id);
+            // Pass user ID (Supabase ID)
+            const success = await acceptInvitation(token, existingUser.id);
 
             if (success) {
                 return res.status(200).json({

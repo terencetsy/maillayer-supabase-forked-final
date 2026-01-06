@@ -1,6 +1,4 @@
-// src/pages/api/brands/[id]/integrations/airtable/fields.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType } from '@/services/integrationService';
 import axios from 'axios';
 
@@ -11,9 +9,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
@@ -26,7 +23,7 @@ export default async function handler(req, res) {
         }
 
         // Get the Airtable integration
-        const integration = await getIntegrationByType('airtable', brandId, session.user.id);
+        const integration = await getIntegrationByType('airtable', brandId, user.id);
 
         if (!integration) {
             return res.status(404).json({ message: 'Airtable integration not found' });

@@ -1,22 +1,18 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
-import connectToDatabase from '@/lib/mongodb';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getBrandById } from '@/services/brandService';
 import { getContactListById } from '@/services/contactService';
-import ContactList from '@/models/ContactList';
-import mongoose from 'mongoose';
+import { contactListsDb } from '@/lib/db/contactLists';
 import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
     try {
-        await connectToDatabase();
-
-        const session = await getServerSession(req, res, authOptions);
-        if (!session || !session.user) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const userId = session.user.id;
+        const userId = user.id;
         const { brandId, listId } = req.query;
 
         // Verify brand exists
@@ -40,10 +36,10 @@ export default async function handler(req, res) {
         // GET - Get current API settings
         if (req.method === 'GET') {
             return res.status(200).json({
-                apiKey: contactList.apiKey || null,
-                apiEnabled: contactList.apiEnabled || false,
-                allowedDomains: contactList.allowedDomains || [],
-                apiSettings: contactList.apiSettings || {
+                apiKey: contactList.api_key || contactList.apiKey || null,
+                apiEnabled: contactList.api_enabled || contactList.apiEnabled || false,
+                allowedDomains: contactList.allowed_domains || contactList.allowedDomains || [],
+                apiSettings: contactList.api_settings || contactList.apiSettings || {
                     requireDoubleOptIn: false,
                     allowDuplicates: false,
                     redirectUrl: '',
@@ -53,18 +49,13 @@ export default async function handler(req, res) {
 
         // POST - Generate new API key
         if (req.method === 'POST') {
-            const newApiKey = `cl_${new mongoose.Types.ObjectId().toString()}_${Date.now().toString(36)}`;
+            const newApiKey = `cl_${crypto.randomUUID()}_${Date.now().toString(36)}`;
 
-            await ContactList.updateOne(
-                { _id: new mongoose.Types.ObjectId(listId) },
-                {
-                    $set: {
-                        apiKey: newApiKey,
-                        apiEnabled: true,
-                        updatedAt: new Date(),
-                    },
-                }
-            );
+            await contactListsDb.update(listId, {
+                api_key: newApiKey,
+                api_enabled: true,
+                updated_at: new Date()
+            });
 
             return res.status(200).json({
                 success: true,
@@ -78,26 +69,26 @@ export default async function handler(req, res) {
             const { apiEnabled, allowedDomains, apiSettings } = req.body;
 
             const updateData = {
-                updatedAt: new Date(),
+                updated_at: new Date(),
             };
 
             if (typeof apiEnabled === 'boolean') {
-                updateData.apiEnabled = apiEnabled;
+                updateData.api_enabled = apiEnabled;
             }
 
             if (Array.isArray(allowedDomains)) {
-                updateData.allowedDomains = allowedDomains.filter((d) => d.trim());
+                updateData.allowed_domains = allowedDomains.filter((d) => d.trim());
             }
 
             if (apiSettings) {
-                updateData.apiSettings = {
+                updateData.api_settings = {
                     requireDoubleOptIn: apiSettings.requireDoubleOptIn || false,
                     allowDuplicates: apiSettings.allowDuplicates || false,
                     redirectUrl: apiSettings.redirectUrl || '',
                 };
             }
 
-            await ContactList.updateOne({ _id: new mongoose.Types.ObjectId(listId) }, { $set: updateData });
+            await contactListsDb.update(listId, updateData);
 
             return res.status(200).json({
                 success: true,
@@ -107,15 +98,10 @@ export default async function handler(req, res) {
 
         // DELETE - Disable API and remove key
         if (req.method === 'DELETE') {
-            await ContactList.updateOne(
-                { _id: new mongoose.Types.ObjectId(listId) },
-                {
-                    $set: {
-                        apiEnabled: false,
-                        updatedAt: new Date(),
-                    },
-                }
-            );
+            await contactListsDb.update(listId, {
+                api_enabled: false,
+                updated_at: new Date()
+            });
 
             return res.status(200).json({
                 success: true,

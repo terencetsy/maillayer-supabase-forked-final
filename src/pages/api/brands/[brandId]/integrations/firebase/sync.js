@@ -1,12 +1,9 @@
-// src/pages/api/brands/[id]/integrations/firebase/sync.js
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/pages/api/auth/[...nextauth]';
+import { getUserFromRequest } from '@/lib/supabase';
 import { getIntegrationByType, updateIntegration } from '@/services/integrationService';
 import { admin } from '@/lib/firebase-admin';
-import connectToDatabase from '@/lib/mongodb';
-import Contact from '@/models/Contact';
-import ContactList from '@/models/ContactList';
-import mongoose from 'mongoose';
+import { contactsDb } from '@/lib/db/contacts';
+import { contactListsDb } from '@/lib/db/contactLists';
+import { checkBrandPermission, PERMISSIONS } from '@/lib/authorization';
 
 export default async function handler(req, res) {
     // Check if method is POST
@@ -15,9 +12,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Authenticate the user
-        const session = await getServerSession(req, res, authOptions);
-        if (!session) {
+        const { user } = await getUserFromRequest(req, res);
+        if (!user) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
@@ -29,11 +25,14 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Brand ID is required' });
         }
 
-        // Connect to database
-        await connectToDatabase();
+        // Check permission
+        const authCheck = await checkBrandPermission(brandId, user.id, PERMISSIONS.EDIT_INTEGRATIONS);
+        if (!authCheck.authorized) {
+            return res.status(authCheck.status).json({ message: authCheck.message });
+        }
 
         // Get the integration
-        const integration = await getIntegrationByType('firebase', brandId, session.user.id);
+        const integration = await getIntegrationByType('firebase', brandId, user.id);
 
         if (!integration) {
             return res.status(404).json({ message: 'Firebase integration not found' });
@@ -77,31 +76,18 @@ export default async function handler(req, res) {
 
         if (createNewList && newListName) {
             // Create a new contact list
-            const contactList = new ContactList({
+            newList = await contactListsDb.create(brandId, user.id, {
                 name: newListName,
                 description: 'Auto-created list for Firebase Auth users',
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-                contactCount: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
             });
-
-            await contactList.save();
-            contactListId = contactList._id;
-            newList = contactList;
+            contactListId = newList.id;
         } else if (listId) {
             // Use existing list
             contactListId = listId;
 
             // Verify the list exists and belongs to this brand
-            const contactList = await ContactList.findOne({
-                _id: new mongoose.Types.ObjectId(listId),
-                brandId: new mongoose.Types.ObjectId(brandId),
-                userId: new mongoose.Types.ObjectId(session.user.id),
-            });
-
-            if (!contactList) {
+            const contactList = await contactListsDb.getById(listId);
+            if (!contactList || contactList.brand_id !== brandId) {
                 return res.status(404).json({ message: 'Contact list not found' });
             }
         } else {
@@ -115,34 +101,25 @@ export default async function handler(req, res) {
         const users = await fetchAllFirebaseUsers(auth);
 
         // Sync users to the contact list
-        const { importedCount, updatedCount, skippedCount } = await syncUsersToContacts(users, contactListId, brandId, session.user.id, lastSyncedAt);
+        const { importedCount, updatedCount, skippedCount } = await syncUsersToContacts(users, contactListId, brandId, user.id, lastSyncedAt);
 
         // Update the lastSyncedAt timestamp in the integration
         const now = new Date();
-        await updateIntegration(integration._id, brandId, session.user.id, {
+        await updateIntegration(integration.id, brandId, user.id, {
             config: {
                 ...integration.config,
                 lastSyncedAt: now,
                 // Store auto-sync configuration if it's a manual sync from the UI
                 autoSyncEnabled: integration.config.autoSyncEnabled ?? false,
-                autoSyncListId: contactListId.toString(),
+                autoSyncListId: contactListId,
                 createNewList: false,
                 newListName: '',
             },
         });
 
         // Update contact count for the list
-        const totalContacts = await Contact.countDocuments({
-            listId: contactListId,
-        });
-
-        await ContactList.updateOne(
-            { _id: contactListId },
-            {
-                contactCount: totalContacts,
-                updatedAt: now,
-            }
-        );
+        const totalContacts = await contactsDb.countByListId(contactListId);
+        await contactListsDb.update(contactListId, { contact_count: totalContacts });
 
         // Return success response
         return res.status(200).json({
@@ -150,10 +127,10 @@ export default async function handler(req, res) {
             listId: contactListId.toString(),
             newList: newList
                 ? {
-                      _id: newList._id.toString(),
-                      name: newList.name,
-                      contactCount: totalContacts,
-                  }
+                    id: newList.id,
+                    name: newList.name,
+                    contactCount: totalContacts,
+                }
                 : null,
             importedCount,
             updatedCount,
@@ -198,77 +175,45 @@ async function syncUsersToContacts(users, listId, brandId, userId, lastSyncedAt)
 
     for (let i = 0; i < users.length; i += BATCH_SIZE) {
         const batch = users.slice(i, i + BATCH_SIZE);
+        const contactsToUpsert = [];
 
-        // Process each user in the batch
-        const operations = batch
-            .map((user) => {
-                // Skip users without email
-                if (!user.email) {
-                    skippedCount++;
-                    return null;
-                }
+        batch.forEach((user) => {
+            // Skip users without email
+            if (!user.email) {
+                skippedCount++;
+                return;
+            }
 
-                // Parse name from displayName
-                let firstName = '';
-                let lastName = '';
+            // Parse name from displayName
+            let firstName = '';
+            let lastName = '';
 
-                if (user.displayName) {
-                    const nameParts = user.displayName.split(' ');
-                    firstName = nameParts[0] || '';
-                    lastName = nameParts.slice(1).join(' ') || '';
-                }
+            if (user.displayName) {
+                const nameParts = user.displayName.split(' ');
+                firstName = nameParts[0] || '';
+                lastName = nameParts.slice(1).join(' ') || '';
+            }
 
-                // Find this part in the syncUsersToContacts function and update it:
+            const contactData = {
+                brand_id: brandId,
+                email: user.email.toLowerCase(),
+                first_name: firstName,
+                last_name: lastName,
+                phone: user.phoneNumber || '',
+                user_id: userId,
+                updated_at: new Date(),
+                status: user.disabled ? 'unsubscribed' : 'active'
+            };
 
-                // Create contact data for fields we want to update for all contacts
-                const contactData = {
-                    email: user.email.toLowerCase(),
-                    firstName,
-                    lastName,
-                    phone: user.phoneNumber || '',
-                    listId: new mongoose.Types.ObjectId(listId),
-                    brandId: new mongoose.Types.ObjectId(brandId),
-                    userId: new mongoose.Types.ObjectId(userId),
-                    updatedAt: new Date(),
-                };
+            contactsToUpsert.push(contactData);
+        });
 
-                // Only set status for new contacts or when Firebase user is disabled
-                // This way we respect manual status changes but still sync disabled state
-                if (user.disabled) {
-                    contactData.status = 'unsubscribed'; // Override status only when user is disabled in Firebase
-                }
-
-                // Return an upsert operation with modified structure
-                return {
-                    updateOne: {
-                        filter: {
-                            email: user.email.toLowerCase(),
-                            listId: new mongoose.Types.ObjectId(listId),
-                        },
-                        update: {
-                            $set: contactData,
-                            $setOnInsert: {
-                                createdAt: new Date(),
-                            },
-                        },
-                        upsert: true,
-                    },
-                };
-            })
-            .filter((op) => op !== null); // Filter out null operations (skipped users)
-
-        // Execute the bulk operation if we have operations
-        if (operations.length > 0) {
-            try {
-                const bulkResult = await Contact.bulkWrite(operations);
-                importedCount += bulkResult.upsertedCount || 0;
-                updatedCount += bulkResult.modifiedCount || 0;
-
-                // If a document matched but wasn't modified, count it as skipped
-                skippedCount += bulkResult.matchedCount - bulkResult.modifiedCount;
-            } catch (error) {
-                console.error('Error in bulk write operation:', error);
-                throw error;
+        if (contactsToUpsert.length > 0) {
+            const upsertedData = await contactsDb.bulkUpsert(contactsToUpsert);
+            if (upsertedData) {
+                const contactIds = upsertedData.map(c => c.id);
+                importedCount += contactIds.length;
+                await contactsDb.bulkAddToList(contactIds, listId);
             }
         }
     }
